@@ -1,0 +1,14 @@
+[Unit]
+Description=Using vmtouch to preload programs
+
+# Ordering
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/big-preload
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

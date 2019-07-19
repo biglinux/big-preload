@@ -1,0 +1,11 @@
+Package: big-preload
+Version: 1.0.0-1big4
+Depends: vmtouch
+Conflicts: lxqt-cleancache
+Architecture: all
+Maintainer: Bruno Goncalves <www.biglinux.com.br>
+Section: admin
+Priority: optional
+Installed-Size:240
+Description: Preload system to make super fast desktop
+

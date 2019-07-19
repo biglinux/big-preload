@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Boot
+nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/boot
+
+
+# To liveusb
+if [ "$(cat /var/lib/sddm/state.conf)" = "" ]; then
+    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/plasma
+    exit
+fi
+
+# Any plasma
+if [ "$(grep "plasma.*.desktop" /var/lib/sddm/state.conf)" != "" ]; then
+    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/plasma
+    exit
+fi
+
+# lxqt
+if [ "$(grep "lxqt.desktop" /var/lib/sddm/state.conf)" != "" ]; then
+    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/lxqt
+    exit
+fi
+
+
+
