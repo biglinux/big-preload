@@ -6,6 +6,6 @@ Architecture: all
 Maintainer: Bruno Goncalves <www.biglinux.com.br>
 Section: admin
 Priority: optional
-Installed-Size:240
+Installed-Size:108
 Description: Preload system to make super fast desktop
 
