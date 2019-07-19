@@ -1,8 +1,13 @@
 #!/bin/sh
 
-# Boot
-nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/boot
+if [ -e "/etc/big-preload/disable" ]; then
+    exit
+fi
 
+if [ -e "/etc/big-preload/user" ]; then
+    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/userfiles
+    exit
+fi
 
 # To liveusb
 if [ "$(cat /var/lib/sddm/state.conf)" = "" ]; then

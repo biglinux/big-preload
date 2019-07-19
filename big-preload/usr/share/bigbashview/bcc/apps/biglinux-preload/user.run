@@ -1,0 +1,6 @@
+rm -f /etc/big-preload/disable
+touch /etc/big-preload/user
+
+lsof | awk '/ mem/  {print $8}' | grep -e /usr -e /opt -e /lib | sort -u | uniq > /etc/big-preload/userfiles
+
+kdialog --msgbox "Seleção aplicada!"
