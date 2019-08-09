@@ -1,7 +1,7 @@
 30433ee372557eee10d961ce21e246e9  DEBIAN/postinst
 53ccf1740b3c6807d1de9f23e909e28c  DEBIAN/prerm
 d41d8cd98f00b204e9800998ecf8427e  DEBIAN/md5sums
-edcf4ab4a4a3673e1b6beb434ab17fe9  DEBIAN/control
+9708cbb1dfdce4c29c36f58042ee0228  DEBIAN/control
 2754a035fa6f2adcb26dd496e0ac4ec8  etc/big-preload/plasma
 e8580a7d1290f330fc166ad1081e4d24  etc/big-preload/lxqt
 65efe262c7e3137f396ccc462915e997  usr/bin/big-preload
@@ -9,6 +9,6 @@ f4da58a217bc3ea15f8cfbc6097d5bf5  usr/share/bigbashview/bcc/apps/biglinux-preloa
 026c7219292dd7082574b415ec206111  usr/share/bigbashview/bcc/apps/biglinux-preload/disable.run
 603f04a1e2b05e9116652edfadb05f24  usr/share/bigbashview/bcc/apps/biglinux-preload/logo.png
 30e389a1c1695014ba9d17a7588d217a  usr/share/bigbashview/bcc/apps/biglinux-preload/user.run
-246a3877068578318c7725fc7de533ac  usr/share/bigbashview/bcc/apps/biglinux-preload/index.sh.htm
+ebfec0e2803955e31849376226d28d54  usr/share/bigbashview/bcc/apps/biglinux-preload/index.sh.htm
 f89c89dd897af1805e6d180605701877  usr/share/applications/big-preload.desktop
 d89e464df2bd9a540b349e86573fc889  lib/systemd/system/big-preload.service
