@@ -1,4 +1,0 @@
-touch /etc/big-preload/disable
-rm -f /etc/big-preload/user
-
-kdialog --msgbox "Seleção aplicada!"

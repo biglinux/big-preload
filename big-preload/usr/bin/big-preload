@@ -1,31 +1,14 @@
 #!/bin/sh
 
-if [ -e "/etc/big-preload/disable" ]; then
-    exit
-fi
-
-if [ -e "/etc/big-preload/user" ]; then
-    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/userfiles
-    exit
-fi
-
-# To liveusb
-if [ "$(cat /var/lib/sddm/state.conf)" = "" ]; then
-    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/plasma
-    exit
-fi
-
-# Any plasma
-if [ "$(grep "plasma.*.desktop" /var/lib/sddm/state.conf)" != "" ]; then
-    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/plasma
-    exit
-fi
-
-# lxqt
-if [ "$(grep "lxqt.desktop" /var/lib/sddm/state.conf)" != "" ]; then
-    nice -n+20 ionice -c 3 vmtouch -vt -b /etc/big-preload/lxqt
-    exit
-fi
-
-
+#QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 sddm-greeter &
+#QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 plasmashell &
+nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/biglinux)
+nice -n+20 ionice -c 3 feh
+QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 sddm-greeter
+QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 plasmashell
+QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 kwin_x11.orig
+QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview /usr/share/bigbashview/close.sh
+nice -n+20 ionice -c 3 firefox --private-window
+nice -n+20 ionice -c 3 chromium --safe-mode --incognito
+nice -n+20 ionice -c 3 google-chrome --safe-mode --incognito
 

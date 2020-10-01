@@ -2,7 +2,7 @@
 Description=Using vmtouch to preload programs
 
 # Ordering
-After=multi-user.target
+After=local-fs.target
 
 [Service]
 Type=oneshot
