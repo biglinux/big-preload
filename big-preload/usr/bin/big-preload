@@ -2,13 +2,25 @@
 
 #QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 sddm-greeter &
 #QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 plasmashell &
-nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/biglinux)
-nice -n+20 ionice -c 3 feh
-QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 sddm-greeter
-QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 plasmashell
-QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 kwin_x11.orig
-QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview /usr/share/bigbashview/close.sh
-nice -n+20 ionice -c 3 firefox --private-window
-nice -n+20 ionice -c 3 chromium --safe-mode --incognito
-nice -n+20 ionice -c 3 google-chrome --safe-mode --incognito
 
+
+# Verify greater than 1,5 Gb RAM
+if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
+
+# Verify if not live mode
+	nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/biglinux)
+	if [ ! -e "/rofs" ]; then
+		QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview -t qt /usr/share/bigbashview/close.sh
+	fi
+fi
+
+# Verify greater than 2.7 Gb RAM
+if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2700000" ]; then
+	nice -n+20 ionice -c 3 vmtouch -i locales -t /usr/lib/firefox/* /usr/lib/chromium/* /opt/google/chrome/*
+fi
+
+
+# Verify greater than 3.4 Gb RAM
+if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "3400000" ]; then
+    nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/lowriter)
+fi

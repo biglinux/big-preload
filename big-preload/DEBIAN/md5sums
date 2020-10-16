@@ -1,9 +1,12 @@
-8e9cb5dfdf574fc2da92da47ee0f5ebf  DEBIAN/control
 d41d8cd98f00b204e9800998ecf8427e  DEBIAN/md5sums
 30433ee372557eee10d961ce21e246e9  DEBIAN/postinst
 53ccf1740b3c6807d1de9f23e909e28c  DEBIAN/prerm
+0a60c9a2b621ba1b520d0d213d7351fe  DEBIAN/control
 e8580a7d1290f330fc166ad1081e4d24  etc/big-preload/lxqt
 2754a035fa6f2adcb26dd496e0ac4ec8  etc/big-preload/plasma
-48dc042d8f134f10c5b2414ada79e766  etc/big-preload/biglinux
+74e483673130e265880a76dce16433f5  etc/big-preload/biglinux
+3f178037399083994dc9ae829504ccd7  etc/big-preload/lowriter
+7379f37ca90a1efebad169271a3072bc  etc/big-preload/clean.sh
+5f8c2ab425ab460eecce278e7c9dd3bd  etc/big-preload/lowriter-clean
 61c7e7e3bed6d9c6f9c7a11d4a7dc1a3  lib/systemd/system/big-preload.service
-29ab93d084a93e62472a1465c0061e86  usr/bin/big-preload
+2a5f50dcba423910c963f9bf3dfa3a73  usr/bin/big-preload
