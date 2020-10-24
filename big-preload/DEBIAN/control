@@ -1,5 +1,5 @@
 Package: big-preload
-Version: 1.0.2-1big4
+Version: 1.0.2-1big6
 Depends: vmtouch, bigsudo
 Conflicts: lxqt-cleancache
 Architecture: all

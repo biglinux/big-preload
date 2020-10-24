@@ -17,6 +17,7 @@ fi
 # Verify greater than 2.7 Gb RAM
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2700000" ]; then
 	nice -n+20 ionice -c 3 vmtouch -i locales -t /usr/lib/firefox/* /usr/lib/chromium/* /opt/google/chrome/*
+	#nice -n+20 ionice -c 3 vmtouch -i locales -t /opt/google/chrome/*
 fi
 
 
