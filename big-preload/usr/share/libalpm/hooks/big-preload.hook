@@ -1,0 +1,9 @@
+[Trigger]
+Type = Package
+Operation = Install
+Target =  big-preload
+
+[Action]
+Description = Automatic enable big-preload
+When = PostTransaction
+Exec = /usr/bin/systemctl enable big-preload
