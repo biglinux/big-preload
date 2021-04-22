@@ -5,6 +5,7 @@ pkgver=1.0.0
 pkgrel=0
 arch=('any')
 license=('GPL')
+depends=('vmtouch')
 url="https://github.com/biglinux/big-preload"
 pkgdesc="Preload some files to make system faster"
 source=("git+https://github.com/biglinux/big-preload.git")
