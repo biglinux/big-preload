@@ -1,12 +1,13 @@
 d41d8cd98f00b204e9800998ecf8427e  DEBIAN/md5sums
 30433ee372557eee10d961ce21e246e9  DEBIAN/postinst
 53ccf1740b3c6807d1de9f23e909e28c  DEBIAN/prerm
-01a1a1d256c2cb168d41fbae79ca544a  DEBIAN/control
+9d91c54ae298e577d30a577bce553406  DEBIAN/control
 e8580a7d1290f330fc166ad1081e4d24  etc/big-preload/lxqt
 2754a035fa6f2adcb26dd496e0ac4ec8  etc/big-preload/plasma
-74e483673130e265880a76dce16433f5  etc/big-preload/biglinux
 3f178037399083994dc9ae829504ccd7  etc/big-preload/lowriter
 7379f37ca90a1efebad169271a3072bc  etc/big-preload/clean.sh
 5f8c2ab425ab460eecce278e7c9dd3bd  etc/big-preload/lowriter-clean
-61c7e7e3bed6d9c6f9c7a11d4a7dc1a3  lib/systemd/system/big-preload.service
-54515325da1bc2ecb2a152b8b35e0fe6  usr/bin/big-preload
+38edefde6299f1ee9dfd310691efe112  etc/big-preload/biglinux
+78d950e1605ca086a4cdee9942bd80a0  usr/bin/big-preload
+61c7e7e3bed6d9c6f9c7a11d4a7dc1a3  usr/lib/systemd/system/big-preload.service
+915d874299371778a608ce6d00a349b7  usr/share/libalpm/hooks/big-preload.hook

@@ -3,12 +3,21 @@
 #QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 sddm-greeter &
 #QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 plasmashell &
 
+#SDDM
+nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm-greeter.distrib /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
+
+nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm-greeter.distrib /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper
+
+#KDE
+nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/pulseaudio /usr/bin/msm_kde_notifier /usr/lib/disman_backend_launcher /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/pulse/gsettings-helper /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/lib/qt/plugins/kf5/kio/file.so /usr/bin/ksplashqml.distrib | grep "=> " | awk '{print $3}' | sort | uniq)
+
+nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/pulseaudio /usr/bin/msm_kde_notifier /usr/lib/disman_backend_launcher /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/pulse/gsettings-helper /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/lib/qt/plugins/kf5/kio/file.so /usr/bin/ksplashqml.distrib
 
 # Verify greater than 1,5 Gb RAM
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
 
 # Verify if not live mode
-	nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/biglinux)
+	#nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/biglinux)
 	if [ ! -e "/rofs" ]; then
 		QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview -t qt /usr/share/bigbashview/close.sh
 	fi
@@ -16,12 +25,45 @@ fi
 
 # Verify greater than 2.7 Gb RAM
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2700000" ]; then
-	nice -n+20 ionice -c 3 vmtouch -i locales -t /usr/lib/firefox/* /usr/lib/brave/* /opt/google/chrome/*
+	nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/firefox/ /usr/lib/brave/ /opt/google/chrome/
+	nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/brave/brave /opt/google/chrome/chrome /usr/lib/firefox/firefox | grep "=> " | awk '{print $3}' | sort | uniq)
+
+	#nice -n+20 ionice -c 3 vmtouch -f /usr/lib/brave/brave /opt/google/chrome/chrome /usr/lib/firefox/firefox
 	#nice -n+20 ionice -c 3 vmtouch -i locales -t /opt/google/chrome/*
 fi
 
 
 # Verify greater than 3.4 Gb RAM
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "3400000" ]; then
-    nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/lowriter)
+    #nice -n+20 ionice -c 3 vmtouch -t -f /usr/lib/libreoffice/program/*
+	nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/libreoffice/program/soffice.bin /usr/bin/gnome-calculator /usr/bin/smplayer /usr/bin/clementine | grep "=> " | awk '{print $3}' | sort | uniq)
+	nice -n+20 ionice -c 3 vmtouch -f /usr/lib/libreoffice/program/soffice.bin /usr/bin/gnome-calculator /usr/bin/smplayer /usr/bin/clementine
 fi
+
+
+##########################
+# OLD WAY
+##########################
+
+
+# # Verify greater than 1,5 Gb RAM
+# if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
+# 
+# # Verify if not live mode
+# 	nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/biglinux)
+# 	if [ ! -e "/rofs" ]; then
+# 		QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview -t qt /usr/share/bigbashview/close.sh
+# 	fi
+# fi
+# 
+# # Verify greater than 2.7 Gb RAM
+# if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2700000" ]; then
+# 	nice -n+20 ionice -c 3 vmtouch -i locales -t /usr/lib/firefox/* /usr/lib/brave/* /opt/google/chrome/*
+# 	#nice -n+20 ionice -c 3 vmtouch -i locales -t /opt/google/chrome/*
+# fi
+# 
+# 
+# # Verify greater than 3.4 Gb RAM
+# if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "3400000" ]; then
+#     nice -n+20 ionice -c 3 vmtouch -t $(cat /etc/big-preload/lowriter)
+# fi

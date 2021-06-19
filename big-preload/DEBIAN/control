@@ -1,11 +1,11 @@
 Package: big-preload
-Version: 1.0.2-1big6
+Version: 1.0.2-1big7
 Depends: vmtouch, bigsudo
 Conflicts: lxqt-cleancache
 Architecture: all
 Maintainer: Bruno Goncalves <www.biglinux.com.br>
 Section: admin
 Priority: optional
-Installed-Size:228
+Installed-Size:152
 Description: Preload system to make super fast desktop
 
