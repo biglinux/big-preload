@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Preload user desktop
+Exec=big-preload-user-gen-list
+Terminal=false
+Type=Application
+StartupNotify=false
+Categories=System

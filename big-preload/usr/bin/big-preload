@@ -8,6 +8,12 @@ nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm-gre
 
 nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm-greeter.distrib /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper
 
+
+#PRELOAD user last login
+BIG_PRELOAD_USER="$(grep ^User= /var/lib/sddm/state.conf | cut -f2 -d=)"
+nice -n+20 ionice -c 3 vmtouch -t $(cat /home/${BIG_PRELOAD_USER}/.big_preload)
+
+
 #KDE
 nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/pulseaudio /usr/bin/msm_kde_notifier /usr/lib/disman_backend_launcher /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/pulse/gsettings-helper /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/lib/qt/plugins/kf5/kio/file.so /usr/bin/ksplashqml.distrib | grep "=> " | awk '{print $3}' | sort | uniq)
 
