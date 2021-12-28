@@ -11,12 +11,12 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
         nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm-greeter.distrib /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper
 
         #KDE
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/pulseaudio /usr/bin/msm_kde_notifier /usr/lib/disman_backend_launcher /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/pulse/gsettings-helper /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/lib/qt/plugins/kf5/kio/file.so /usr/bin/ksplashqml.distrib | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/pipewire-media-session /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib | grep "=> " | awk '{print $3}' | sort | uniq)
 
-        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/pulseaudio /usr/bin/msm_kde_notifier /usr/lib/disman_backend_launcher /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/pulse/gsettings-helper /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/lib/qt/plugins/kf5/kio/file.so /usr/bin/ksplashqml.distrib
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/pipewire-media-session /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib
 
         #PRELOAD user last login
-        BIG_PRELOAD_USER="$(grep ^User= /var/lib/sddm/state.conf | cut -f2 -d=)"
+        BIG_PRELOAD_USER="$(grep ^User= /var/lib/sddm/state.conf | cut -f2 -d= | sed 's| $||g')"
         nice -n+20 ionice -c 3 vmtouch -t $(cat /home/${BIG_PRELOAD_USER}/.big_preload)
         
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/gnome-calculator /usr/bin/smplayer /usr/bin/clementine | grep "=> " | awk '{print $3}' | sort | uniq)
@@ -26,7 +26,7 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
 fi
 
 #bigbashview
-QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview -t qt /usr/share/bigbashview/close.sh
+#QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview -t gtk /usr/share/bigbashview/close.sh &
 
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2500000" ]; then
 
@@ -38,6 +38,8 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2500000" ]; then
     if [ -e "/etc/big-preload/enable-brave" ]; then
         nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave/
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/brave/brave | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave-browser/
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/brave-browser/brave | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-chrome" ]; then
