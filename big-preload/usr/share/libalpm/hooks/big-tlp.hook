@@ -1,0 +1,10 @@
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = big-preload
+
+[Action]
+Description = Change TLP configuration
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/big-tlp
