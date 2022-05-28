@@ -6,7 +6,7 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
     if [ -e "/etc/big-preload/enable-kde" ]; then
 
         #SDDM
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm-greeter.distrib /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm-greeter /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
 
         nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm-greeter.distrib /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper
 
