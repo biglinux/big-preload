@@ -84,3 +84,6 @@ if [ -e "/etc/big-preload/enable-libreoffice" ]; then
         nice -n+20 ionice -c 3 vmtouch -f /usr/lib/libreoffice/program/soffice.bin
     fi
 fi
+
+# Intel faster
+sysctl -q -w dev.i915.perf_stream_paranoid=0 2> /dev/null
