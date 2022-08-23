@@ -1,5 +1,0 @@
-#!/bin/sh
-
-systemctl enable big-preload
-
-exit 0

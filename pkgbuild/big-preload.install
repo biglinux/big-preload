@@ -1,0 +1,12 @@
+post_install() {
+mkdir -p /etc/big-preload/
+touch /etc/big-preload/enable-brave
+touch /etc/big-preload/enable-chrome
+touch /etc/big-preload/enable-firefox
+touch /etc/big-preload/enable-kde
+touch /etc/big-preload/enable-libreoffice
+}
+
+post_remove() {
+rm -f /etc/big-preload/enable-*
+} 
