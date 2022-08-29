@@ -25,8 +25,10 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
     fi
 fi
 
-#bigbashview
-QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview -t qt 'execute close$' &
+if [ ! -e "/livefs-pkgs.txt" ]; then
+    #bigbashview
+    QT_QPA_PLATFORM=offscreen nice -n+20 ionice -c 3 bigbashview -t qt 'execute close$' &
+fi
 
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2500000" ]; then
 
