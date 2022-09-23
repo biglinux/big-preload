@@ -6,7 +6,8 @@ After=local-fs.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/big-preload
+# Use - to ignore exit 1 when preload bigbashview
+ExecStart=-/usr/bin/big-preload
 User=root
 Group=root
 
