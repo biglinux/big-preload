@@ -1,20 +1,24 @@
 #!/bin/sh
 
+displayManagerLink="$(readlink /etc/systemd/system/display-manager.service)"
+
 # Verify greater than 1,5 Gb RAM
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
 
-    if [ -e "/etc/big-preload/enable-kde" ]; then
+    # KDE Plasma
+    if [ "$displayManagerLink" = "/usr/lib/systemd/system/sddm.service" ]; then
 
         #SDDM
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm-greeter /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper
 
-        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm-greeter.distrib /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
 
         #KDE
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/pipewire-media-session /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/wireplumber /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib
 
-        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/pipewire-media-session /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/wireplumber /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib | grep "=> " | awk '{print $3}' | sort | uniq)
 
+        
         #PRELOAD user last login
         BIG_PRELOAD_USER="$(grep ^User= /var/lib/sddm/state.conf | cut -f2 -d= | sed 's| $||g')"
         nice -n+20 ionice -c 3 vmtouch -t $(cat /home/${BIG_PRELOAD_USER}/.big_preload)
@@ -23,7 +27,21 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
         nice -n+20 ionice -c 3 vmtouch -f /usr/bin/gnome-calculator /usr/bin/smplayer /usr/bin/clementine
 
     fi
+
+    # Gnome
+    if [ "$displayManagerLink" = "/usr/lib/systemd/system/gdm.service" ]; then
+            # GDM
+            nice -n+20 ionice -c 3 vmtouch -f /usr/bin/gdm /usr/bin/gnome-shell /usr/bin/Xwayland /usr/bin/gjs /usr/bin/wireplumber /usr/lib/gdm-session-worker /usr/lib/gdm-wayland-session /usr/bin/gdmflexiserver
+            
+            nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/gdm /usr/bin/gnome-shell /usr/bin/Xwayland /usr/bin/gjs /usr/bin/wireplumber /usr/lib/gdm-session-worker /usr/lib/gdm-wayland-session /usr/bin/gdmflexiserver | grep "=> " | awk '{print $3}' | sort | uniq)
+    
+            nice -n+20 ionice -c 3 vmtouch -f /usr/lib/evolution-data-server/evolution-alarm-notify /usr/lib/gsd-xsettings /usr/lib/xdg-desktop-portal-gnome /usr/lib/tracker-miner-fs-3 /usr/lib/xdg-desktop-portal-gtk /usr/lib/gsd-power /usr/lib/gsd-media-keys /usr/lib/gsd-wacom /usr/lib/gsd-color /usr/lib/gsd-keyboard /usr/lib/gnome-session-binary /usr/lib/gvfs-udisks2-volume-monitor /usr/lib/gsd-datetime /usr/lib/gvfsd-recent /usr/lib/xdg-desktop-portal /usr/lib/goa-identity-service /usr/lib/gsd-sound /usr/lib/evolution-calendar-factory /usr/bin/gnome-keyring-daemon /usr/lib/gvfs-afc-volume-monitor /usr/lib/gsd-disk-utility-notify /usr/lib/evolution-addressbook-factory /usr/lib/gsd-smartcard /usr/lib/gvfs-gphoto2-volume-monitor /usr/lib/dconf-service /usr/lib/gsd-housekeeping /usr/lib/gsd-usb-protection /usr/lib/xdg-document-portal /usr/lib/at-spi2-registryd /usr/lib/at-spi-bus-launcher /usr/lib/gsd-rfkill /usr/lib/gsd-sharing /usr/lib/gvfs-goa-volume-monitor /usr/lib/gsd-a11y-settings /usr/lib/gvfsd-metadata /usr/lib/bluetooth/obexd /usr/lib/gvfs-mtp-volume-monitor /usr/lib/gvfsd-trash /usr/lib/gvfsd /usr/lib/gsd-screensaver-proxy /usr/lib/xdg-permission-store /usr/lib/gsd-print-notifications /usr/lib/gnome-session-ctl /usr/lib/gsd-printer /usr/lib/gvfsd-fuse /usr/lib/goa-daemon /usr/lib/gnome-shell-calendar-server /usr/bin/nautilus /usr/bin/gnome-calculator /usr/bin/kgx /usr/bin/gnome-system-monitor /usr/bin/gnome-text-editor
+            
+            nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/evolution-data-server/evolution-alarm-notify /usr/lib/gsd-xsettings /usr/lib/xdg-desktop-portal-gnome /usr/lib/tracker-miner-fs-3 /usr/lib/xdg-desktop-portal-gtk /usr/lib/gsd-power /usr/lib/gsd-media-keys /usr/lib/gsd-wacom /usr/lib/gsd-color /usr/lib/gsd-keyboard /usr/lib/gnome-session-binary /usr/lib/gvfs-udisks2-volume-monitor /usr/lib/gsd-datetime /usr/lib/gvfsd-recent /usr/lib/xdg-desktop-portal /usr/lib/goa-identity-service /usr/lib/gsd-sound /usr/lib/evolution-calendar-factory /usr/bin/gnome-keyring-daemon /usr/lib/gvfs-afc-volume-monitor /usr/lib/gsd-disk-utility-notify /usr/lib/evolution-addressbook-factory /usr/lib/gsd-smartcard /usr/lib/gvfs-gphoto2-volume-monitor /usr/lib/dconf-service /usr/lib/gsd-housekeeping /usr/lib/gsd-usb-protection /usr/lib/xdg-document-portal /usr/lib/at-spi2-registryd /usr/lib/at-spi-bus-launcher /usr/lib/gsd-rfkill /usr/lib/gsd-sharing /usr/lib/gvfs-goa-volume-monitor /usr/lib/gsd-a11y-settings /usr/lib/gvfsd-metadata /usr/lib/bluetooth/obexd /usr/lib/gvfs-mtp-volume-monitor /usr/lib/gvfsd-trash /usr/lib/gvfsd /usr/lib/gsd-screensaver-proxy /usr/lib/xdg-permission-store /usr/lib/gsd-print-notifications /usr/lib/gnome-session-ctl /usr/lib/gsd-printer /usr/lib/gvfsd-fuse /usr/lib/goa-daemon /usr/lib/gnome-shell-calendar-server /usr/bin/nautilus /usr/bin/gnome-calculator /usr/bin/kgx /usr/bin/gnome-system-monitor /usr/bin/gnome-text-editor | grep "=> " | awk '{print $3}' | sort | uniq)
+    fi
 fi
+
+
 
 if [ ! -e "/livefs-pkgs.txt" ]; then
     #bigbashview
@@ -41,6 +59,7 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2500000" ]; then
         nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave/
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/brave/brave | grep "=> " | awk '{print $3}' | sort | uniq)
         nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave-browser/
+        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave-browser/brave
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/brave-browser/brave | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
