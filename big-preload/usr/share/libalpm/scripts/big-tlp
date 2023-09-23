@@ -1,7 +1,0 @@
-#!/bin/bash
-
-if [ ! -e "/etc/big-preload/tlp-configured" ]; then
-    cp -f /usr/share/biglinux/tlp.conf /etc/tlp.conf
-fi
-
-> /etc/big-preload/tlp-configured
