@@ -9,22 +9,22 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
     if [ "$displayManagerLink" = "/usr/lib/systemd/system/sddm.service" ]; then
 
         #SDDM
-        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper /usr/bin/kwin_wayland
 
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
 
         #KDE
-        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/wireplumber /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland /usr/bin/dbus-broker-launch /usr/lib/dconf-service /usr/lib/kactivitymanagerd /usr/bin/ksmserver /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/ksplashqml
 
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded5 /usr/bin/kglobalaccel5 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd5 /usr/bin/startplasma-x11 /usr/bin/dbus-broker-launch /usr/lib/kf5/start_kdeinit /usr/lib/kf5/klauncher /usr/lib/dconf-service /usr/bin/xsettingsd /usr/lib/kactivitymanagerd /usr/bin/ksmserver.distrib /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/baloo_file /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/bin/pamac-tray-plasma /usr/lib/bluetooth/obexd /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/kf5/kscreen_backend_launcher /usr/bin/konsole /usr/bin/pipewire /usr/bin/pipewire-pulse /usr/bin/wireplumber /usr/lib/qt/plugins/kf5/kio/kio_file.so /usr/bin/ksplashqml.distrib | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland /usr/bin/dbus-broker-launch /usr/lib/dconf-service /usr/lib/kactivitymanagerd /usr/bin/ksmserver /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/ksplashqml | grep "=> " | awk '{print $3}' | sort | uniq)
 
         
         #PRELOAD user last login
         BIG_PRELOAD_USER="$(grep ^User= /var/lib/sddm/state.conf | cut -f2 -d= | sed 's| $||g')"
         nice -n+20 ionice -c 3 vmtouch -t $(cat /home/${BIG_PRELOAD_USER}/.big_preload)
         
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/gnome-calculator /usr/bin/smplayer /usr/bin/clementine | grep "=> " | awk '{print $3}' | sort | uniq)
-        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/gnome-calculator /usr/bin/smplayer /usr/bin/clementine
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/gnome-calculator | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/gnome-calculator
 
     fi
 
@@ -51,45 +51,42 @@ fi
 if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2500000" ]; then
 
     if [ -e "/etc/big-preload/enable-firefox" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/firefox/
+        nice -n+20 ionice -c 3 vmtouch -f /usr/lib/firefox/
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/firefox/firefox | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-brave" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave/
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/brave/brave | grep "=> " | awk '{print $3}' | sort | uniq)
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave-browser/
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/brave-browser/brave
+        nice -n+20 ionice -c 3 vmtouch -f  /usr/lib/brave-browser/brave
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/brave-browser/brave | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-chrome" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /opt/google/chrome/
+        nice -n+20 ionice -c 3 vmtouch -f /opt/google/chrome/chrome
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /opt/google/chrome/chrome | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-chromium" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/chromium/
+        nice -n+20 ionice -c 3 vmtouch -f /usr/lib/chromium/chromium
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/chromium/chromium | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-palemoon" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/palemoon/
+        nice -n+20 ionice -c 3 vmtouch -f /usr/lib/palemoon/palemoon-bin
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/palemoon/palemoon-bin | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-opera" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/opera/
+        nice -n+20 ionice -c 3 vmtouch -f /usr/lib/opera/opera
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/opera/opera | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-vivaldi" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /opt/vivaldi/
+        nice -n+20 ionice -c 3 vmtouch -f /opt/vivaldi/vivaldi-bin
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /opt/vivaldi/vivaldi-bin | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
     if [ -e "/etc/big-preload/enable-epiphany" ]; then
-        nice -n+20 ionice -c 3 vmtouch -i locales -t -f /usr/lib/epiphany/
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/epiphany
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/epiphany | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
 
@@ -102,7 +99,6 @@ if [ -e "/etc/big-preload/enable-libreoffice" ]; then
     if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "3400000" ]; then
         nice -n+20 ionice -c 3 vmtouch -t -f /usr/lib/libreoffice/program/*
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/libreoffice/program/soffice.bin | grep "=> " | awk '{print $3}' | sort | uniq)
-        nice -n+20 ionice -c 3 vmtouch -f /usr/lib/libreoffice/program/soffice.bin
     fi
 fi
 
