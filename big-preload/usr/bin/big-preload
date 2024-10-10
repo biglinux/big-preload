@@ -9,9 +9,9 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "1500000" ]; then
     if [ "$displayManagerLink" = "/usr/lib/systemd/system/sddm.service" ]; then
 
         #SDDM
-        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper /usr/bin/kwin_wayland
+        nice -n+20 ionice -c 3 vmtouch -f /usr/bin/sddm /usr/bin/sddm-greeter-qt6 /usr/lib/Xorg /usr/lib/sddm/sddm-helper /usr/bin/kwin_wayland
 
-        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/bin/sddm /usr/bin/sddm-greeter-qt6 /usr/lib/Xorg /usr/lib/sddm/sddm-helper | grep "=> " | awk '{print $3}' | sort | uniq)
 
         #KDE
         nice -n+20 ionice -c 3 vmtouch -f /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland /usr/bin/dbus-broker-launch /usr/lib/dconf-service /usr/lib/kactivitymanagerd /usr/bin/ksmserver /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/lib/kdeconnectd /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/ksplashqml
