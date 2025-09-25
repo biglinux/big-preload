@@ -54,6 +54,11 @@ if [ "$(grep MemTotal /proc/meminfo | awk '{ print $2 }')" -gt "2500000" ]; then
         nice -n+20 ionice -c 3 vmtouch -f /usr/lib/firefox/
         nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/firefox/firefox | grep "=> " | awk '{print $3}' | sort | uniq)
     fi
+    
+    if [ -e "/etc/big-preload/enable-librewolf" ]; then
+        nice -n+20 ionice -c 3 vmtouch -f /usr/lib/librewolf/librewolf
+        nice -n+20 ionice -c 3 vmtouch -f $(nice -n+20 ionice -c 3 ldd /usr/lib/librewolf/librewolf | grep "=> " | awk '{print $3}' | sort | uniq)
+    fi
 
     if [ -e "/etc/big-preload/enable-brave" ]; then
         nice -n+20 ionice -c 3 vmtouch -f  /usr/lib/brave-browser/brave
