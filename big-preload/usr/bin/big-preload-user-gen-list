@@ -1,7 +1,39 @@
-#!/bin/sh
+#!/bin/bash
+#
+# big-preload-user-gen-list - Generate preload list for next login
+# Captures memory-mapped files from desktop environment processes
+# to speed up subsequent logins
+#
 
+# Wait for desktop to fully initialize
 sleep 30
 
-if [ ! -e "/livefs-pkgs.txt" ]; then
-    /usr/bin/lsof -c plasmashell -c kwin_x11 -c kwin_wayland -c kded6 | grep ' mem ' | awk '{print $8}' | sort -r -u > ~/.big_preload
+# Skip if running from live filesystem
+[[ -e /livefs-pkgs.txt ]] && exit 0
+
+# Detect desktop environment from XDG_CURRENT_DESKTOP
+desktop="${XDG_CURRENT_DESKTOP,,}"  # Convert to lowercase
+
+# Function to capture memory-mapped files from processes
+generate_preload_list() {
+    local processes="$1"
+    # shellcheck disable=SC2086
+    /usr/bin/lsof $processes 2>/dev/null | awk '/ mem / {print $9}' | sort -u > ~/.big_preload
+}
+
+# KDE Plasma
+if [[ $desktop == *kde* || $desktop == *plasma* ]]; then
+    generate_preload_list "-c plasmashell -c kwin_x11 -c kwin_wayland -c kded6 -c dolphin -c konsole"
+
+# GNOME
+elif [[ $desktop == *gnome* ]]; then
+    generate_preload_list "-c gnome-shell -c gnome-session -c nautilus -c gsd- -c tracker-miner"
+
+# Cinnamon
+elif [[ $desktop == *cinnamon* ]]; then
+    generate_preload_list "-c cinnamon -c nemo -c csd- -c cinnamon-session -c muffin"
+
+# XFCE
+elif [[ $desktop == *xfce* ]]; then
+    generate_preload_list "-c xfce4-panel -c xfwm4 -c xfdesktop -c xfce4-session -c thunar -c xfce4-terminal"
 fi
