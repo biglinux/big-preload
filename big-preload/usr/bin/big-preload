@@ -1,132 +1,196 @@
 #!/bin/bash
 #
-# big-preload - Preload essential files into memory at boot time
-# Uses vmtouch with low priority to avoid impacting boot performance
+# big-preload - Preload essential files into page cache at boot
+# Uses vmtouch with low CPU/IO priority to avoid impacting boot performance.
+# The -t flag is required: without it vmtouch only diagnoses cache state.
 #
 
-dm_link=${ readlink /etc/systemd/system/display-manager.service; }
+set +e  # best-effort; never block boot
+
+preload() {
+    # Touch all given files (and their shared-library dependencies) into page cache.
+    # Usage: preload FILE [FILE...]
+    local libs
+    libs=${ ldd "$@" 2>/dev/null | awk '/=>/ {print $3}' | sort -u; }
+    # shellcheck disable=SC2086
+    nice -n 19 ionice -c 3 vmtouch -q -t -f $libs "$@" >/dev/null 2>&1
+}
+
+preload_file_list() {
+    # Read a newline-separated list of paths and preload them.
+    # Usage: preload_file_list PATH
+    local list=$1
+    [[ -r $list ]] || return 0
+    # shellcheck disable=SC2046
+    nice -n 19 ionice -c 3 vmtouch -q -t $(<"$list") >/dev/null 2>&1
+}
+
+dm_link=${ readlink /etc/systemd/system/display-manager.service 2>/dev/null; }
 mem_kb=${ awk '/MemTotal/ {print $2}' /proc/meminfo; }
 
 # Desktop environment preloading (requires >= 1.5 GB RAM)
-if [[ $mem_kb -gt 1500000 ]]; then
+if (( mem_kb > 1500000 )); then
 
     # KDE Plasma / SDDM
     if [[ $dm_link == */sddm.service ]]; then
-        # SDDM
-        files='/usr/bin/sddm /usr/bin/sddm-greeter /usr/lib/sddm/sddm-helper /usr/bin/kwin_wayland'
-        nice -n 20 ionice -c 3 vmtouch -f ${ ldd $files 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } $files
+        preload /usr/bin/sddm /usr/bin/sddm-greeter /usr/bin/sddm-greeter-qt6 \
+                /usr/lib/sddm/sddm-helper /usr/bin/kwin_wayland
 
-        # KDE Plasma core
-        files='/usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 /usr/bin/dolphin /usr/bin/kate'
-        files+=' /usr/bin/kwalletd6 /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland'
-        files+=' /usr/bin/dbus-broker-launch /usr/lib/dconf-service /usr/lib/kactivitymanagerd'
-        files+=' /usr/bin/ksmserver /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil'
-        files+=' /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy /usr/bin/kdeconnectd'
-        files+=' /usr/lib/geoclue-2.0/demos/agent /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse'
-        files+=' /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber /usr/bin/ksplashqml'
-        nice -n 20 ionice -c 3 vmtouch -f ${ ldd $files 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } $files
+        preload /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 \
+                /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 \
+                /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland \
+                /usr/bin/dbus-broker-launch /usr/lib/dconf-service \
+                /usr/lib/kactivitymanagerd /usr/bin/ksmserver \
+                /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil \
+                /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy \
+                /usr/bin/kdeconnectd /usr/lib/geoclue-2.0/demos/agent \
+                /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
+                /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber \
+                /usr/bin/ksplashqml
 
-        # Last logged-in user's custom preload list
-        user=${ awk -F= '/^User=/ {gsub(/ $/,"",$2); print $2}' /var/lib/sddm/state.conf 2>/dev/null; }
-        [[ -f /home/$user/.big_preload ]] && nice -n 20 ionice -c 3 vmtouch -t $(</home/$user/.big_preload)
+        # Last logged-in user's custom preload list (SDDM state file)
+        user=${ awk -F= '/^User=/ {gsub(/[[:space:]]+$/,"",$2); print $2}' /var/lib/sddm/state.conf 2>/dev/null; }
+        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
 
-        # Calculator (commonly used)
-        nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/bin/gnome-calculator 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/bin/gnome-calculator
+        preload /usr/bin/gnome-calculator
     fi
 
     # GNOME / GDM
     if [[ $dm_link == */gdm.service ]]; then
-        # GDM
-        files='/usr/bin/gdm /usr/bin/gnome-shell /usr/bin/Xwayland /usr/bin/gjs /usr/bin/wireplumber'
-        files+=' /usr/lib/gdm-session-worker /usr/lib/gdm-wayland-session /usr/bin/gdmflexiserver'
-        nice -n 20 ionice -c 3 vmtouch -f ${ ldd $files 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } $files
+        preload /usr/bin/gdm /usr/bin/gnome-shell /usr/bin/Xwayland \
+                /usr/bin/gjs /usr/bin/wireplumber \
+                /usr/lib/gdm-session-worker /usr/lib/gdm-wayland-session \
+                /usr/bin/gdmflexiserver
 
-        # GNOME services and apps
-        files='/usr/lib/evolution-data-server/evolution-alarm-notify /usr/lib/gsd-xsettings'
-        files+=' /usr/lib/xdg-desktop-portal-gnome /usr/lib/tracker-miner-fs-3 /usr/lib/xdg-desktop-portal-gtk'
-        files+=' /usr/lib/gsd-power /usr/lib/gsd-media-keys /usr/lib/gsd-wacom /usr/lib/gsd-color'
-        files+=' /usr/lib/gsd-keyboard /usr/lib/gnome-session-binary /usr/lib/gvfs-udisks2-volume-monitor'
-        files+=' /usr/lib/gsd-datetime /usr/lib/gvfsd-recent /usr/lib/xdg-desktop-portal'
-        files+=' /usr/lib/goa-identity-service /usr/lib/gsd-sound /usr/lib/evolution-calendar-factory'
-        files+=' /usr/bin/gnome-keyring-daemon /usr/lib/gvfs-afc-volume-monitor /usr/lib/gsd-disk-utility-notify'
-        files+=' /usr/lib/evolution-addressbook-factory /usr/lib/gsd-smartcard /usr/lib/gvfs-gphoto2-volume-monitor'
-        files+=' /usr/lib/dconf-service /usr/lib/gsd-housekeeping /usr/lib/gsd-usb-protection'
-        files+=' /usr/lib/xdg-document-portal /usr/lib/at-spi2-registryd /usr/lib/at-spi-bus-launcher'
-        files+=' /usr/lib/gsd-rfkill /usr/lib/gsd-sharing /usr/lib/gvfs-goa-volume-monitor'
-        files+=' /usr/lib/gsd-a11y-settings /usr/lib/gvfsd-metadata /usr/lib/bluetooth/obexd'
-        files+=' /usr/lib/gvfs-mtp-volume-monitor /usr/lib/gvfsd-trash /usr/lib/gvfsd'
-        files+=' /usr/lib/gsd-screensaver-proxy /usr/lib/xdg-permission-store /usr/lib/gsd-print-notifications'
-        files+=' /usr/lib/gnome-session-ctl /usr/lib/gsd-printer /usr/lib/gvfsd-fuse /usr/lib/goa-daemon'
-        files+=' /usr/lib/gnome-shell-calendar-server /usr/bin/nautilus /usr/bin/gnome-calculator'
-        files+=' /usr/bin/kgx /usr/bin/gnome-system-monitor /usr/bin/gnome-text-editor'
-        nice -n 20 ionice -c 3 vmtouch -f ${ ldd $files 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } $files
+        preload /usr/lib/evolution-data-server/evolution-alarm-notify \
+                /usr/lib/gsd-xsettings /usr/lib/xdg-desktop-portal-gnome \
+                /usr/lib/tracker-miner-fs-3 /usr/lib/xdg-desktop-portal-gtk \
+                /usr/lib/gsd-power /usr/lib/gsd-media-keys /usr/lib/gsd-wacom \
+                /usr/lib/gsd-color /usr/lib/gsd-keyboard /usr/lib/gnome-session-binary \
+                /usr/lib/gvfs-udisks2-volume-monitor /usr/lib/gsd-datetime \
+                /usr/lib/gvfsd-recent /usr/lib/xdg-desktop-portal \
+                /usr/lib/goa-identity-service /usr/lib/gsd-sound \
+                /usr/lib/evolution-calendar-factory /usr/bin/gnome-keyring-daemon \
+                /usr/lib/gvfs-afc-volume-monitor /usr/lib/gsd-disk-utility-notify \
+                /usr/lib/evolution-addressbook-factory /usr/lib/gsd-smartcard \
+                /usr/lib/gvfs-gphoto2-volume-monitor /usr/lib/dconf-service \
+                /usr/lib/gsd-housekeeping /usr/lib/gsd-usb-protection \
+                /usr/lib/xdg-document-portal /usr/lib/at-spi2-registryd \
+                /usr/lib/at-spi-bus-launcher /usr/lib/gsd-rfkill /usr/lib/gsd-sharing \
+                /usr/lib/gvfs-goa-volume-monitor /usr/lib/gsd-a11y-settings \
+                /usr/lib/gvfsd-metadata /usr/lib/bluetooth/obexd \
+                /usr/lib/gvfs-mtp-volume-monitor /usr/lib/gvfsd-trash \
+                /usr/lib/gvfsd /usr/lib/gsd-screensaver-proxy \
+                /usr/lib/xdg-permission-store /usr/lib/gsd-print-notifications \
+                /usr/lib/gnome-session-ctl /usr/lib/gsd-printer /usr/lib/gvfsd-fuse \
+                /usr/lib/goa-daemon /usr/lib/gnome-shell-calendar-server \
+                /usr/bin/nautilus /usr/bin/gnome-calculator /usr/bin/kgx \
+                /usr/bin/gnome-system-monitor /usr/bin/gnome-text-editor
 
-        # Last logged-in user's custom preload list (GDM uses AccountsService)
-        user=${ awk -F= '/^SystemAccount=false/ {found=1} found && /^UserName=/ {print $2; exit}' /var/lib/AccountsService/users/* 2>/dev/null; }
-        # Fallback: get last modified user file
-        [[ -z $user ]] && user=${ ls -t /var/lib/AccountsService/users/ 2>/dev/null | head -1; }
-        [[ -f /home/$user/.big_preload ]] && nice -n 20 ionice -c 3 vmtouch -t $(</home/$user/.big_preload)
+        # Last logged-in user via AccountsService: sort by mtime (most recent login
+        # updates the user file), then verify it's a regular user account.
+        user=
+        # shellcheck disable=SC2043  # valsub `${ ; }` not understood by shellcheck
+        for f in ${ ls -t /var/lib/AccountsService/users/ 2>/dev/null; }; do
+            if awk -F= '
+                /^SystemAccount=/  { sys = ($2 == "true") }
+                /^UserName=/       { name = $2 }
+                END { if (!sys && name != "") print name }
+            ' "/var/lib/AccountsService/users/$f" | grep -q .; then
+                user=$f
+                break
+            fi
+        done
+        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
     fi
 
-    # Cinnamon / LightDM
+    # Cinnamon / XFCE / MATE / Budgie / LXQt on LightDM
     if [[ $dm_link == */lightdm.service ]]; then
-        # LightDM
-        files='/usr/bin/lightdm /usr/lib/lightdm-gtk-greeter /usr/lib/Xorg /usr/bin/slick-greeter'
-        nice -n 20 ionice -c 3 vmtouch -f ${ ldd $files 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } $files
+        preload /usr/bin/lightdm /usr/lib/lightdm-gtk-greeter \
+                /usr/bin/slick-greeter /usr/lib/Xorg
 
-        # Detect session type from LightDM state
+        # Session type (lightdm-gtk-greeter and slick-greeter share this cache path
+        # for the *user* select state; fallback to /etc/lightdm if missing).
         session=${ awk -F= '/^user-session=/ {print tolower($2)}' /var/lib/lightdm/.cache/lightdm-gtk-greeter/state 2>/dev/null; }
+        [[ -z $session ]] && session=${ awk -F= '/^user-session=/ {gsub(/[[:space:]]+/,"",$0); print tolower($2)}' /etc/lightdm/lightdm.conf 2>/dev/null; }
 
-        # Cinnamon desktop
-        if [[ $session == *cinnamon* ]]; then
-            files='/usr/bin/cinnamon /usr/bin/nemo /usr/bin/cinnamon-session /usr/bin/cinnamon-launcher'
-            files+=' /usr/bin/cinnamon-settings-daemon /usr/bin/cinnamon-killer-daemon /usr/bin/muffin'
-            files+=' /usr/bin/cinnamon-screensaver /usr/lib/cinnamon-settings-daemon/csd-xsettings'
-            files+=' /usr/lib/cinnamon-settings-daemon/csd-power /usr/lib/cinnamon-settings-daemon/csd-keyboard'
-            files+=' /usr/lib/cinnamon-settings-daemon/csd-media-keys /usr/lib/cinnamon-settings-daemon/csd-clipboard'
-            files+=' /usr/lib/cinnamon-settings-daemon/csd-a11y-settings /usr/lib/polkit-gnome-authentication-agent-1'
-            files+=' /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/bin/gnome-terminal'
-            nice -n 20 ionice -c 3 vmtouch -f ${ ldd $files 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } $files
-        fi
+        case $session in
+            *cinnamon*)
+                preload /usr/bin/cinnamon /usr/bin/nemo /usr/bin/cinnamon-session \
+                        /usr/bin/cinnamon-launcher /usr/bin/cinnamon-settings-daemon \
+                        /usr/bin/cinnamon-killer-daemon /usr/bin/muffin \
+                        /usr/bin/cinnamon-screensaver \
+                        /usr/lib/cinnamon-settings-daemon/csd-xsettings \
+                        /usr/lib/cinnamon-settings-daemon/csd-power \
+                        /usr/lib/cinnamon-settings-daemon/csd-keyboard \
+                        /usr/lib/cinnamon-settings-daemon/csd-media-keys \
+                        /usr/lib/cinnamon-settings-daemon/csd-clipboard \
+                        /usr/lib/cinnamon-settings-daemon/csd-a11y-settings \
+                        /usr/lib/polkit-gnome-authentication-agent-1 \
+                        /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
+                        /usr/bin/gnome-terminal
+                ;;
+            *xfce*)
+                preload /usr/bin/xfce4-session /usr/bin/xfwm4 /usr/bin/xfce4-panel \
+                        /usr/bin/xfdesktop /usr/bin/thunar /usr/bin/xfce4-terminal \
+                        /usr/bin/xfce4-settings-manager /usr/bin/xfce4-power-manager \
+                        /usr/bin/xfce4-notifyd /usr/lib/xfce4/panel/wrapper-2.0 \
+                        /usr/lib/tumbler-1/tumblerd /usr/lib/xfce4/xfconf/xfconfd \
+                        /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
+                        /usr/lib/polkit-gnome-authentication-agent-1
+                ;;
+            *mate*)
+                preload /usr/bin/mate-session /usr/bin/mate-panel /usr/bin/marco \
+                        /usr/bin/caja /usr/bin/mate-terminal /usr/bin/mate-settings-daemon \
+                        /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
+                        /usr/lib/polkit-gnome-authentication-agent-1
+                ;;
+            *budgie*)
+                preload /usr/bin/budgie-desktop /usr/bin/budgie-panel /usr/bin/budgie-wm \
+                        /usr/bin/nautilus /usr/bin/gnome-terminal \
+                        /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse
+                ;;
+            *lxqt*)
+                preload /usr/bin/lxqt-session /usr/bin/lxqt-panel /usr/bin/pcmanfm-qt \
+                        /usr/bin/qterminal /usr/bin/openbox \
+                        /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse
+                ;;
+            *deepin*)
+                preload /usr/bin/startdde /usr/bin/dde-desktop /usr/bin/dde-dock \
+                        /usr/bin/dde-file-manager /usr/bin/deepin-terminal \
+                        /usr/lib/deepin-daemon/dde-session-daemon \
+                        /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse
+                ;;
+        esac
 
-        # XFCE desktop
-        if [[ $session == *xfce* ]]; then
-            files='/usr/bin/xfce4-session /usr/bin/xfwm4 /usr/bin/xfce4-panel /usr/bin/xfdesktop'
-            files+=' /usr/bin/thunar /usr/bin/xfce4-terminal /usr/bin/xfce4-settings-manager'
-            files+=' /usr/bin/xfce4-power-manager /usr/bin/xfce4-notifyd /usr/lib/xfce4/panel/wrapper-2.0'
-            files+=' /usr/lib/tumbler-1/tumblerd /usr/lib/xfce4/xfconf/xfconfd'
-            files+=' /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse /usr/lib/polkit-gnome-authentication-agent-1'
-            nice -n 20 ionice -c 3 vmtouch -f ${ ldd $files 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } $files
-        fi
+        # Last logged-in user (LightDM state file)
+        user=${ awk -F= '/^last-user=/ {gsub(/[[:space:]]+/,"",$0); print $2}' /var/lib/lightdm/.cache/lightdm-gtk-greeter/state 2>/dev/null; }
+        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
 
-        # Last logged-in user's custom preload list (LightDM state file)
-        user=${ awk -F= '/^last-user=/ {print $2}' /var/lib/lightdm/.cache/lightdm-gtk-greeter/state 2>/dev/null; }
-        [[ -f /home/$user/.big_preload ]] && nice -n 20 ionice -c 3 vmtouch -t $(</home/$user/.big_preload)
-
-        # Calculator (commonly used)
-        nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/bin/gnome-calculator 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/bin/gnome-calculator
+        preload /usr/bin/gnome-calculator
     fi
 fi
 
 # Browser preloading (requires >= 2.5 GB RAM)
-if [[ $mem_kb -gt 2500000 ]]; then
-    [[ -e /etc/big-preload/enable-firefox ]]   && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/lib/firefox/firefox 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/lib/firefox/
-    [[ -e /etc/big-preload/enable-brave ]]     && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/lib/brave-browser/brave 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/lib/brave-browser/brave
-    [[ -e /etc/big-preload/enable-chrome ]]    && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /opt/google/chrome/chrome 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /opt/google/chrome/chrome
-    [[ -e /etc/big-preload/enable-chromium ]]  && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/lib/chromium/chromium 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/lib/chromium/chromium
-    [[ -e /etc/big-preload/enable-palemoon ]]  && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/lib/palemoon/palemoon-bin 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/lib/palemoon/palemoon-bin
-    [[ -e /etc/big-preload/enable-opera ]]     && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/lib/opera/opera 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/lib/opera/opera
-    [[ -e /etc/big-preload/enable-vivaldi ]]   && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /opt/vivaldi/vivaldi-bin 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /opt/vivaldi/vivaldi-bin
-    [[ -e /etc/big-preload/enable-epiphany ]]  && nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/bin/epiphany 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/bin/epiphany
+if (( mem_kb > 2500000 )); then
+    [[ -e /etc/big-preload/enable-firefox   ]] && preload /usr/lib/firefox/firefox
+    [[ -e /etc/big-preload/enable-librewolf ]] && preload /usr/lib/librewolf/librewolf
+    [[ -e /etc/big-preload/enable-brave     ]] && preload /usr/lib/brave-browser/brave
+    [[ -e /etc/big-preload/enable-chrome    ]] && preload /opt/google/chrome/chrome
+    [[ -e /etc/big-preload/enable-chromium  ]] && preload /usr/lib/chromium/chromium
+    [[ -e /etc/big-preload/enable-palemoon  ]] && preload /usr/lib/palemoon/palemoon-bin
+    [[ -e /etc/big-preload/enable-opera     ]] && preload /usr/lib/opera/opera
+    [[ -e /etc/big-preload/enable-vivaldi   ]] && preload /opt/vivaldi/vivaldi-bin
+    [[ -e /etc/big-preload/enable-epiphany  ]] && preload /usr/bin/epiphany
 fi
 
 # LibreOffice preloading (requires >= 3.4 GB RAM)
-if [[ -e /etc/big-preload/enable-libreoffice && $mem_kb -gt 3400000 ]]; then
-    nice -n 20 ionice -c 3 vmtouch -t -f /usr/lib/libreoffice/program/*
-    nice -n 20 ionice -c 3 vmtouch -f ${ ldd /usr/lib/libreoffice/program/soffice.bin 2>/dev/null | awk '/=>/ {print $3}' | sort -u; } /usr/lib/libreoffice/program/soffice.bin
+if [[ -e /etc/big-preload/enable-libreoffice ]] && (( mem_kb > 3400000 )); then
+    nice -n 19 ionice -c 3 vmtouch -q -t -f /usr/lib/libreoffice/program/ >/dev/null 2>&1
+    preload /usr/lib/libreoffice/program/soffice.bin
 fi
 
-# Intel GPU performance tweak
+# Intel GPU perf counter access (harmless on non-Intel systems)
 sysctl -q -w dev.i915.perf_stream_paranoid=0 2>/dev/null
 
 exit 0

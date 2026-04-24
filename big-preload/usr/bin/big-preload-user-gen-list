@@ -1,39 +1,60 @@
 #!/bin/bash
 #
-# big-preload-user-gen-list - Generate preload list for next login
-# Captures memory-mapped files from desktop environment processes
-# to speed up subsequent logins
+# big-preload-user-gen-list - Capture memory-mapped files of the running
+# desktop session into ~/.big_preload so the next boot can preload them.
 #
 
-# Wait for desktop to fully initialize
-sleep 30
+# Single-instance lock per user session to prevent concurrent runs.
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/big-preload-user-gen-list.lock" 2>/dev/null || exit 0
+flock -n 9 || exit 0
 
-# Skip if running from live filesystem
+# Skip on live media
 [[ -e /livefs-pkgs.txt ]] && exit 0
 
-# Detect desktop environment from XDG_CURRENT_DESKTOP
-desktop="${XDG_CURRENT_DESKTOP,,}"  # Convert to lowercase
+# Need a writable home
+[[ -w ${HOME:-/nonexistent} ]] || exit 0
 
-# Function to capture memory-mapped files from processes
+# Let the session settle before sampling (panel applets, file indexers, etc.)
+sleep 30
+
 generate_preload_list() {
-    local processes="$1"
+    # Captures /proc/<pid>/maps-equivalent output from lsof for matching processes
+    # and writes a sorted, de-duplicated path list to ~/.big_preload.
     # shellcheck disable=SC2086
-    /usr/bin/lsof $processes 2>/dev/null | awk '/ mem / {print $9}' | sort -u > ~/.big_preload
+    /usr/bin/lsof $1 2>/dev/null \
+        | awk '$4 == "mem" && $NF ~ /^\// {print $NF}' \
+        | sort -u > "$HOME/.big_preload.tmp" \
+        && mv -f "$HOME/.big_preload.tmp" "$HOME/.big_preload"
 }
 
-# KDE Plasma
-if [[ $desktop == *kde* || $desktop == *plasma* ]]; then
-    generate_preload_list "-c plasmashell -c kwin_x11 -c kwin_wayland -c kded6 -c dolphin -c konsole"
+desktop=${XDG_CURRENT_DESKTOP,,}
 
-# GNOME
-elif [[ $desktop == *gnome* ]]; then
-    generate_preload_list "-c gnome-shell -c gnome-session -c nautilus -c gsd- -c tracker-miner"
-
-# Cinnamon
-elif [[ $desktop == *cinnamon* ]]; then
-    generate_preload_list "-c cinnamon -c nemo -c csd- -c cinnamon-session -c muffin"
-
-# XFCE
-elif [[ $desktop == *xfce* ]]; then
-    generate_preload_list "-c xfce4-panel -c xfwm4 -c xfdesktop -c xfce4-session -c thunar -c xfce4-terminal"
-fi
+case $desktop in
+    *kde*|*plasma*)
+        generate_preload_list "-c plasmashell -c kwin_x11 -c kwin_wayland -c kded6 -c dolphin -c konsole"
+        ;;
+    *gnome*)
+        generate_preload_list "-c gnome-shell -c gnome-session -c nautilus -c gsd- -c tracker-miner"
+        ;;
+    *cinnamon*)
+        generate_preload_list "-c cinnamon -c nemo -c csd- -c cinnamon-session -c muffin"
+        ;;
+    *xfce*)
+        generate_preload_list "-c xfce4-panel -c xfwm4 -c xfdesktop -c xfce4-session -c thunar -c xfce4-terminal"
+        ;;
+    *mate*)
+        generate_preload_list "-c mate-panel -c marco -c caja -c mate-session -c mate-terminal -c mate-settings-"
+        ;;
+    *budgie*)
+        generate_preload_list "-c budgie-panel -c budgie-wm -c budgie-desktop -c nautilus -c gnome-terminal"
+        ;;
+    *lxqt*)
+        generate_preload_list "-c lxqt-panel -c lxqt-session -c pcmanfm-qt -c openbox -c qterminal"
+        ;;
+    *deepin*)
+        generate_preload_list "-c dde-desktop -c dde-dock -c dde-file-manager -c startdde -c deepin-terminal"
+        ;;
+    *pantheon*)
+        generate_preload_list "-c gala -c wingpanel -c plank -c io.elementary.files -c io.elementary.terminal"
+        ;;
+esac

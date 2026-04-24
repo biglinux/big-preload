@@ -1,7 +1,10 @@
 [Desktop Entry]
-Name=Preload user desktop
-Exec=big-preload-user-gen-list
+Name=big-preload user list generator
+Comment=Capture mapped files of current session for next-boot preload
+Exec=/usr/bin/big-preload-user-gen-list
 Terminal=false
 Type=Application
 StartupNotify=false
+NoDisplay=true
+X-GNOME-Autostart-Phase=Applications
 Categories=System

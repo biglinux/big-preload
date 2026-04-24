@@ -1,13 +1,19 @@
 post_install() {
-mkdir -p /etc/big-preload/
-touch /etc/big-preload/enable-brave
-touch /etc/big-preload/enable-chrome
-touch /etc/big-preload/enable-firefox
-touch /etc/big-preload/enable-librewolf
-touch /etc/big-preload/enable-kde
-touch /etc/big-preload/enable-libreoffice
+    install -d /etc/big-preload
+    # Default-enabled browsers and suites. User may drop more enable-* flags
+    # (chromium, opera, vivaldi, palemoon, epiphany) to opt into them.
+    touch /etc/big-preload/enable-firefox \
+          /etc/big-preload/enable-librewolf \
+          /etc/big-preload/enable-brave \
+          /etc/big-preload/enable-chrome \
+          /etc/big-preload/enable-libreoffice
+}
+
+post_upgrade() {
+    post_install
 }
 
 post_remove() {
-rm -f /etc/big-preload/enable-*
-} 
+    rm -f /etc/big-preload/enable-*
+    rmdir --ignore-fail-on-non-empty /etc/big-preload 2>/dev/null || true
+}
