@@ -19,10 +19,11 @@ sleep 30
 
 generate_preload_list() {
     # Captures /proc/<pid>/maps-equivalent output from lsof for matching processes
+    # (on Btrfs lsof appends " (path dev=X,Y)" to each mapped path)
     # and writes a sorted, de-duplicated path list to ~/.big_preload.
     # shellcheck disable=SC2086
     /usr/bin/lsof $1 2>/dev/null \
-        | awk '$4 == "mem" && $NF ~ /^\// {print $NF}' \
+        | awk '$4 == "mem" && $5 == "REG" { sub(/ \(path dev=[^)]*\)$/, ""); if ($NF ~ /^\//) print $NF }' \
         | sort -u > "$HOME/.big_preload.tmp" \
         && mv -f "$HOME/.big_preload.tmp" "$HOME/.big_preload"
 }
