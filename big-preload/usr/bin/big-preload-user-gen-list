@@ -54,6 +54,9 @@ case $desktop in
     *deepin*)
         generate_preload_list "-c dde-desktop -c dde-dock -c dde-file-manager -c startdde -c deepin-terminal"
         ;;
+    *big-compositor*)
+        generate_preload_list "-c big-host -c big-compositor -c xdg-desktop-por"
+        ;;
     *pantheon*)
         generate_preload_list "-c gala -c wingpanel -c plank -c io.elementary.files -c io.elementary.terminal"
         ;;

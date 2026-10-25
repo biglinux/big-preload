@@ -104,6 +104,20 @@ if (( mem_kb > 1500000 )); then
         [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
     fi
 
+    # BigLinux desktop / greetd
+    if [[ $dm_link == */greetd.service ]]; then
+        preload /usr/bin/greetd /usr/lib/bigshell/biggreeter-session \
+                /usr/bin/big-compositor /usr/bin/big-compositor-wrapper \
+                /usr/bin/big-host /usr/lib/big-host/modules/libbig_shell.so \
+                /usr/lib/big-host/modules/libbig_workbench.so \
+                /usr/lib/xdg-desktop-portal-big /usr/lib/xdg-desktop-portal \
+                /usr/bin/dbus-broker-launch /usr/bin/pipewire /usr/bin/wireplumber
+
+        # Last logged-in user (the login screen keeps the name on the first line)
+        user=${ head -n 1 /var/lib/biggreeter/biggreeter/last 2>/dev/null; }
+        [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]] && preload_file_list "/home/$user/.big_preload"
+    fi
+
     # Cinnamon / XFCE / MATE / Budgie / LXQt on LightDM
     if [[ $dm_link == */lightdm.service ]]; then
         preload /usr/bin/lightdm /usr/lib/lightdm-gtk-greeter \
@@ -189,8 +203,5 @@ if [[ -e /etc/big-preload/enable-libreoffice ]] && (( mem_kb > 3400000 )); then
     nice -n 19 ionice -c 3 vmtouch -q -t -f /usr/lib/libreoffice/program/ >/dev/null 2>&1
     preload /usr/lib/libreoffice/program/soffice.bin
 fi
-
-# Intel GPU perf counter access (harmless on non-Intel systems)
-sysctl -q -w dev.i915.perf_stream_paranoid=0 2>/dev/null
 
 exit 0

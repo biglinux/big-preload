@@ -1,14 +1,14 @@
 [Unit]
 Description=Preload essential files into page cache (vmtouch)
+# Runs while the login screen waits for a password. DefaultDependencies=no keeps
+# any target that wants this unit from waiting for it.
 DefaultDependencies=no
+After=display-manager.service
 Conflicts=shutdown.target
-After=systemd-fsck-root.service
-Before=local-fs-pre.target local-fs.target shutdown.target
-Wants=local-fs-pre.target
+Before=shutdown.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=exec
 ExecStart=-/usr/bin/big-preload
 Nice=19
 IOSchedulingClass=idle
@@ -16,4 +16,4 @@ IOSchedulingPriority=7
 CPUSchedulingPolicy=idle
 
 [Install]
-WantedBy=local-fs-pre.target
+WantedBy=graphical.target
