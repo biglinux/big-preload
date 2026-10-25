@@ -19,10 +19,11 @@ sleep 30
 
 generate_preload_list() {
     # Captures /proc/<pid>/maps-equivalent output from lsof for matching processes
+    # (on Btrfs lsof appends " (path dev=X,Y)" to each mapped path)
     # and writes a sorted, de-duplicated path list to ~/.big_preload.
     # shellcheck disable=SC2086
     /usr/bin/lsof $1 2>/dev/null \
-        | awk '$4 == "mem" && $NF ~ /^\// {print $NF}' \
+        | awk '$4 == "mem" && $5 == "REG" { sub(/ \(path dev=[^)]*\)$/, ""); if ($NF ~ /^\//) print $NF }' \
         | sort -u > "$HOME/.big_preload.tmp" \
         && mv -f "$HOME/.big_preload.tmp" "$HOME/.big_preload"
 }
@@ -53,6 +54,9 @@ case $desktop in
         ;;
     *deepin*)
         generate_preload_list "-c dde-desktop -c dde-dock -c dde-file-manager -c startdde -c deepin-terminal"
+        ;;
+    *big-compositor*)
+        generate_preload_list "-c big-host -c big-compositor -c xdg-desktop-por"
         ;;
     *pantheon*)
         generate_preload_list "-c gala -c wingpanel -c plank -c io.elementary.files -c io.elementary.terminal"

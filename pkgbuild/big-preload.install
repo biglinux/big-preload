@@ -11,6 +11,10 @@ post_install() {
 
 post_upgrade() {
     post_install
+    # The unit moved from local-fs-pre.target to graphical.target.
+    if systemctl is-enabled -q big-preload.service 2>/dev/null; then
+        systemctl reenable big-preload.service 2>/dev/null
+    fi
 }
 
 post_remove() {
