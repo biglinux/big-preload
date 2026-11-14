@@ -16,15 +16,6 @@ preload() {
     nice -n 19 ionice -c 3 vmtouch -q -t -f $libs "$@" >/dev/null 2>&1
 }
 
-preload_file_list() {
-    # Read a newline-separated list of paths and preload them.
-    # Usage: preload_file_list PATH
-    local list=$1
-    [[ -r $list ]] || return 0
-    # shellcheck disable=SC2046
-    nice -n 19 ionice -c 3 vmtouch -q -t $(<"$list") >/dev/null 2>&1
-}
-
 preload_big_desktop() {
     preload /usr/bin/big-compositor /usr/bin/big-compositor-wrapper \
             /usr/bin/big-host /usr/lib/big-host/modules/libbig_shell.so \
@@ -64,10 +55,6 @@ if (( mem_kb > 1500000 )); then
                     /usr/bin/ksplashqml
         fi
 
-        # Last logged-in user's custom preload list (SDDM state file)
-        user=${ awk -F= '/^User=/ {gsub(/[[:space:]]+$/,"",$2); print $2}' /var/lib/sddm/state.conf 2>/dev/null; }
-        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
-
         preload /usr/bin/gnome-calculator
     fi
 
@@ -102,32 +89,12 @@ if (( mem_kb > 1500000 )); then
                 /usr/lib/goa-daemon /usr/lib/gnome-shell-calendar-server \
                 /usr/bin/nautilus /usr/bin/gnome-calculator /usr/bin/kgx \
                 /usr/bin/gnome-system-monitor /usr/bin/gnome-text-editor
-
-        # Last logged-in user via AccountsService: sort by mtime (most recent login
-        # updates the user file), then verify it's a regular user account.
-        user=
-        # shellcheck disable=SC2043  # valsub `${ ; }` not understood by shellcheck
-        for f in ${ ls -t /var/lib/AccountsService/users/ 2>/dev/null; }; do
-            if awk -F= '
-                /^SystemAccount=/  { sys = ($2 == "true") }
-                /^UserName=/       { name = $2 }
-                END { if (!sys && name != "") print name }
-            ' "/var/lib/AccountsService/users/$f" | grep -q .; then
-                user=$f
-                break
-            fi
-        done
-        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
     fi
 
     # BigLinux desktop / greetd
     if [[ $dm_link == */greetd.service ]]; then
         preload /usr/bin/greetd /usr/lib/bigshell/biggreeter-session
         preload_big_desktop
-
-        # Last logged-in user (the login screen keeps the name on the first line)
-        user=${ head -n 1 /var/lib/biggreeter/biggreeter/last 2>/dev/null; }
-        [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]] && preload_file_list "/home/$user/.big_preload"
     fi
 
     # Cinnamon / XFCE / MATE / Budgie / LXQt on LightDM
@@ -188,10 +155,6 @@ if (( mem_kb > 1500000 )); then
                         /usr/lib/dconf-service /usr/lib/gvfsd /usr/lib/gvfsd-fuse
                 ;;
         esac
-
-        # Last logged-in user (LightDM state file)
-        user=${ awk -F= '/^last-user=/ {gsub(/[[:space:]]+/,"",$0); print $2}' /var/lib/lightdm/.cache/lightdm-gtk-greeter/state 2>/dev/null; }
-        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
 
         preload /usr/bin/gnome-calculator
     fi
