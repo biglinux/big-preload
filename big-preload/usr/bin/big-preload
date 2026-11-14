@@ -7,14 +7,24 @@
 # for a password, or an automatic login's desktop is up. Measured on a hard
 # disk, reading any earlier, even at idle priority, delayed the login screen
 # by about 2.5 s. It reads at idle CPU and I/O priority, so a login started
-# meanwhile goes first.
-# The -t flag is required: without it vmtouch only diagnoses cache state.
+# meanwhile goes first: the desktop the login screen starts, each account's
+# default web browser, and the browsers and LibreOffice switched on in
+# BigLinux Settings (/etc/big-preload/enable-NAME).
+#
+# With --session, XDG autostart runs it as the account that logged in, at the
+# desktop's first frame, to read that account's browsers and LibreOffice right
+# away: after an automatic login the disk stays busy long after the desktop is
+# up, so the boot's run gets to them late. Whichever run comes second finds
+# the pages in memory and reads nothing.
 #
 
 set +e  # best-effort; never block boot
+mode=boot
+[[ $1 == --session ]] && mode=session
 
 preload() {
     # Touch all given files (and their shared-library dependencies) into page cache.
+    # The -t flag is required: without it vmtouch only diagnoses cache state.
     # Usage: preload FILE [FILE...]
     local libs
     libs=${ ldd "$@" 2>/dev/null | awk '/=>/ {print $3}' | sort -u; }
@@ -43,6 +53,71 @@ preload_big_desktop() {
             /usr/bin/dbus-broker-launch /usr/bin/pipewire /usr/bin/wireplumber
 }
 
+preload_browser() {
+    # The files a browser opens on its way to a first window, traced with
+    # strace, with the translation of the system's language only: its
+    # program directory also holds every other language and libraries that
+    # load later or never. Programs come from fixed directories only.
+    # Usage: preload_browser NAME (the enable-NAME of BigLinux Settings)
+    local family dir program elf translation tag candidate file files=() read_files=() libs
+    case $1 in
+        brave)     family=chromium dir=/usr/lib/brave-browser program=brave ;;
+        chrome)    family=chromium dir=/opt/google/chrome program=chrome ;;
+        chromium)  family=chromium dir=/usr/lib/chromium program=chromium ;;
+        vivaldi)   family=chromium dir=/opt/vivaldi program=vivaldi-bin ;;
+        opera)     family=chromium dir=/usr/lib/opera program=opera ;;
+        firefox)   family=gecko dir=/usr/lib/firefox program=firefox ;;
+        librewolf) family=gecko dir=/usr/lib/librewolf program=librewolf ;;
+        palemoon)  family=gecko dir=/usr/lib/palemoon program=palemoon ;;
+        epiphany)  family=webkit ;;
+        *) return ;;
+    esac
+    case $family in
+        chromium)
+            # Chromium names a translation pt-BR or es; Spanish outside Spain
+            # is es-419, and en-US is what it falls back to.
+            local tags=("$language-$region")
+            [[ $language == es && -n $region && $region != ES ]] && tags+=(es-419)
+            tags+=("$language" en-US)
+            for tag in "${tags[@]}"; do
+                for candidate in "$dir/locales/$tag.pak" "$dir/localization/$tag.pak"; do
+                    [[ -f $candidate ]] && translation=$candidate && break 2
+                done
+            done
+            elf=$dir/$program
+            files=("$elf" "$dir"/*.pak "$dir/icudtl.dat" "$dir/v8_context_snapshot.bin"
+                   "$dir/snapshot_blob.bin" "$translation"
+                   # Google Chrome loads these three at start.
+                   "$dir/liboptimization_guide_internal.so" "$dir/libLiteRtWebGpuAccelerator.so"
+                   "$dir/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so")
+            ;;
+        gecko)
+            # A translation is a language pack from the browser's i18n package.
+            for candidate in "$dir"/browser/extensions/langpack-{"$language-$region","$language"}@*.xpi; do
+                [[ -f $candidate ]] && translation=$candidate && break
+            done
+            elf=$dir/libxul.so
+            files=("$dir/$program" "$elf" "$dir/omni.ja" "$dir/browser/omni.ja"
+                   "$dir/libgkcodecs.so" "$dir/libmozavcodec.so" "$dir/libmozavutil.so"
+                   "$dir/libmozsqlite3.so" "$dir/libmozsandbox.so" "$dir/liblgpllibs.so"
+                   "$dir/libmozwayland.so" "$dir/libmozgtk.so" "$dir/fonts/TwemojiMozilla.ttf"
+                   "$translation")
+            ;;
+        webkit)
+            elf=/usr/bin/epiphany
+            files=("$elf" /usr/lib/webkitgtk-6.0/WebKitWebProcess /usr/lib/webkitgtk-6.0/WebKitNetworkProcess)
+            ;;
+    esac
+    [[ -f $elf ]] || return
+    # A name the installed version lacks, or a glob without a match, is left out.
+    for file in "${files[@]}"; do
+        [[ -f $file ]] && read_files+=("$file")
+    done
+    libs=${ ldd "$elf" 2>/dev/null | awk '/=>/ {print $3}' | sort -u; }
+    # shellcheck disable=SC2086
+    nice -n 19 ionice -c 3 vmtouch -q -t -f "${read_files[@]}" $libs >/dev/null 2>&1
+}
+
 # Only a root on a spinning disk gains: a solid-state disk serves page faults
 # about as fast as vmtouch reads ahead, so every preload below would only
 # compete with the boot. lsblk -s follows each device down to its disks
@@ -63,6 +138,7 @@ rotational=${ lsblk -s -n -o ROTA "${devices[@]}" 2>/dev/null; }
 enable -f /usr/lib/bash/sleep sleep
 disks=${ lsblk -s -n -r -o KNAME,TYPE "${devices[@]}" 2>/dev/null | awk '$2 == "disk" {print $1}'; }
 last="" quiet=0
+[[ $mode == session ]] && quiet=10  # the session is up: no wait
 for (( tick = 0; tick < 900 && quiet < 10; tick++ )); do
     now=""
     for disk in $disks; do
@@ -80,8 +156,17 @@ done
 dm_link=${ readlink /etc/systemd/system/display-manager.service 2>/dev/null; }
 mem_kb=${ awk '/MemTotal/ {print $2}' /proc/meminfo; }
 
+# The language in use, pt_BR.UTF-8 giving pt and BR, for the translations of
+# the browsers and LibreOffice: the session's, or the system's, which systemd
+# hands its services from /etc/locale.conf.
+locale=${LC_ALL:-${LC_MESSAGES:-$LANG}}
+locale=${locale%%[.@]*}
+language=${locale%%_*}
+region=${locale#"$language"}
+region=${region#_}
+
 # Desktop environment preloading (requires >= 1.5 GB RAM)
-if (( mem_kb > 1500000 )); then
+if (( mem_kb > 1500000 )) && [[ $mode == boot ]]; then
 
     # KDE Plasma / SDDM
     if [[ $dm_link == */sddm.service ]]; then
@@ -213,23 +298,58 @@ if (( mem_kb > 1500000 )); then
     fi
 fi
 
-# Browser preloading (requires >= 2.5 GB RAM)
+# Web browsers (requires >= 2.5 GB RAM): the default of the account in the
+# session, or at boot of each account, asked as that account so its settings
+# are not read as root; and the ones switched on.
 if (( mem_kb > 2500000 )); then
-    [[ -e /etc/big-preload/enable-firefox   ]] && preload /usr/lib/firefox/firefox
-    [[ -e /etc/big-preload/enable-librewolf ]] && preload /usr/lib/librewolf/librewolf
-    [[ -e /etc/big-preload/enable-brave     ]] && preload /usr/lib/brave-browser/brave
-    [[ -e /etc/big-preload/enable-chrome    ]] && preload /opt/google/chrome/chrome
-    [[ -e /etc/big-preload/enable-chromium  ]] && preload /usr/lib/chromium/chromium
-    [[ -e /etc/big-preload/enable-palemoon  ]] && preload /usr/lib/palemoon/palemoon-bin
-    [[ -e /etc/big-preload/enable-opera     ]] && preload /usr/lib/opera/opera
-    [[ -e /etc/big-preload/enable-vivaldi   ]] && preload /opt/vivaldi/vivaldi-bin
-    [[ -e /etc/big-preload/enable-epiphany  ]] && preload /usr/bin/epiphany
+    declare -A by_desktop_id=(
+        [brave-browser.desktop]=brave [google-chrome.desktop]=chrome
+        [chromium.desktop]=chromium [vivaldi-stable.desktop]=vivaldi
+        [opera.desktop]=opera [firefox.desktop]=firefox
+        [librewolf.desktop]=librewolf [palemoon.desktop]=palemoon
+        [org.gnome.Epiphany.desktop]=epiphany
+    )
+    declare -A browsers=()
+    if [[ $mode == session ]]; then
+        desktop_id=${ xdg-mime query default x-scheme-handler/https 2>/dev/null; }
+        [[ -n $desktop_id && -n ${by_desktop_id[$desktop_id]} ]] && browsers[${by_desktop_id[$desktop_id]}]=1
+    else
+        while IFS=: read -r _ _ uid gid _ home shell; do
+            (( uid >= 1000 && uid < 60000 )) || continue
+            [[ -d $home && $shell != */nologin && $shell != */false ]] || continue
+            # Bounded: the account owns the files xdg-mime reads, and a FIFO
+            # there would otherwise hold the boot's run forever.
+            desktop_id=${ timeout 5 setpriv --reuid="$uid" --regid="$gid" --init-groups --reset-env \
+                              xdg-mime query default x-scheme-handler/https </dev/null 2>/dev/null; }
+            [[ -n $desktop_id && -n ${by_desktop_id[$desktop_id]} ]] && browsers[${by_desktop_id[$desktop_id]}]=1
+        done </etc/passwd
+    fi
+    for flag in /etc/big-preload/enable-*; do
+        [[ -e $flag ]] && browsers[${flag##*/enable-}]=1
+    done
+    for name in "${!browsers[@]}"; do
+        preload_browser "$name"
+    done
 fi
 
-# LibreOffice preloading (requires >= 3.4 GB RAM)
-if [[ -e /etc/big-preload/enable-libreoffice ]] && (( mem_kb > 3400000 )); then
-    nice -n 19 ionice -c 3 vmtouch -q -t -f /usr/lib/libreoffice/program/ >/dev/null 2>&1
-    preload /usr/lib/libreoffice/program/soffice.bin
+# LibreOffice, when switched on (requires >= 3.4 GB RAM): the libraries,
+# registry and type data its programs load, and only the language in use of
+# its translations; the rest of its 500 MB is templates, galleries and help.
+office=/usr/lib/libreoffice
+if [[ -e /etc/big-preload/enable-libreoffice && -f $office/program/soffice.bin ]] && (( mem_kb > 3400000 )); then
+    office_files=("$office"/program/*.so "$office"/program/*.rdb "$office"/program/types/*.rdb
+                  "$office"/program/services/*.rdb "$office"/share/registry/*.xcd
+                  "$office"/share/config/images_colibre.zip "$office"/share/config/images_elementary.zip)
+    for tag in "$language-$region" "$language"; do
+        if [[ -f $office/share/registry/Langpack-$tag.xcd ]]; then
+            office_files+=("$office/share/registry/res/registry_$tag.xcd"
+                           "$office/share/registry/res/fcfg_langpack_$tag.xcd"
+                           "$office/program/resource/${tag/-/_}"/LC_MESSAGES/*.mo)
+            break
+        fi
+    done
+    preload "$office/program/soffice.bin"
+    nice -n 19 ionice -c 3 vmtouch -q -t -f "${office_files[@]}" >/dev/null 2>&1
 fi
 
 exit 0
