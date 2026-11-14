@@ -25,6 +25,14 @@ preload_file_list() {
     nice -n 19 ionice -c 3 vmtouch -q -t $(<"$list") >/dev/null 2>&1
 }
 
+preload_big_desktop() {
+    preload /usr/bin/big-compositor /usr/bin/big-compositor-wrapper \
+            /usr/bin/big-host /usr/lib/big-host/modules/libbig_shell.so \
+            /usr/lib/big-host/modules/libbig_workbench.so \
+            /usr/lib/xdg-desktop-portal-big /usr/lib/xdg-desktop-portal \
+            /usr/bin/dbus-broker-launch /usr/bin/pipewire /usr/bin/wireplumber
+}
+
 dm_link=${ readlink /etc/systemd/system/display-manager.service 2>/dev/null; }
 mem_kb=${ awk '/MemTotal/ {print $2}' /proc/meminfo; }
 
@@ -36,17 +44,25 @@ if (( mem_kb > 1500000 )); then
         preload /usr/bin/sddm /usr/bin/sddm-greeter /usr/bin/sddm-greeter-qt6 \
                 /usr/lib/sddm/sddm-helper /usr/bin/kwin_wayland
 
-        preload /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 \
-                /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 \
-                /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland \
-                /usr/bin/dbus-broker-launch /usr/lib/dconf-service \
-                /usr/lib/kactivitymanagerd /usr/bin/ksmserver \
-                /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil \
-                /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy \
-                /usr/bin/kdeconnectd /usr/lib/geoclue-2.0/demos/agent \
-                /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
-                /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber \
-                /usr/bin/ksplashqml
+        # The session the login screen offers: Plasma, or the BigLinux desktop
+        # on its own compositor (biglinux.desktop), which maps none of Plasma's
+        # files. biglinux-kwin runs KWin and takes Plasma's list.
+        session=${ awk -F= '/^Session=/ {print $2}' /var/lib/sddm/state.conf 2>/dev/null; }
+        if [[ $session == */biglinux*.desktop* && $session != *biglinux-kwin* ]]; then
+            preload_big_desktop
+        else
+            preload /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 \
+                    /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 \
+                    /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland \
+                    /usr/bin/dbus-broker-launch /usr/lib/dconf-service \
+                    /usr/lib/kactivitymanagerd /usr/bin/ksmserver \
+                    /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil \
+                    /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy \
+                    /usr/bin/kdeconnectd /usr/lib/geoclue-2.0/demos/agent \
+                    /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
+                    /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber \
+                    /usr/bin/ksplashqml
+        fi
 
         # Last logged-in user's custom preload list (SDDM state file)
         user=${ awk -F= '/^User=/ {gsub(/[[:space:]]+$/,"",$2); print $2}' /var/lib/sddm/state.conf 2>/dev/null; }
@@ -106,12 +122,8 @@ if (( mem_kb > 1500000 )); then
 
     # BigLinux desktop / greetd
     if [[ $dm_link == */greetd.service ]]; then
-        preload /usr/bin/greetd /usr/lib/bigshell/biggreeter-session \
-                /usr/bin/big-compositor /usr/bin/big-compositor-wrapper \
-                /usr/bin/big-host /usr/lib/big-host/modules/libbig_shell.so \
-                /usr/lib/big-host/modules/libbig_workbench.so \
-                /usr/lib/xdg-desktop-portal-big /usr/lib/xdg-desktop-portal \
-                /usr/bin/dbus-broker-launch /usr/bin/pipewire /usr/bin/wireplumber
+        preload /usr/bin/greetd /usr/lib/bigshell/biggreeter-session
+        preload_big_desktop
 
         # Last logged-in user (the login screen keeps the name on the first line)
         user=${ head -n 1 /var/lib/biggreeter/biggreeter/last 2>/dev/null; }
