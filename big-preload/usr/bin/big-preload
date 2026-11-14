@@ -24,6 +24,21 @@ preload_big_desktop() {
             /usr/bin/dbus-broker-launch /usr/bin/pipewire /usr/bin/wireplumber
 }
 
+# Only a root on a spinning disk gains: a solid-state disk serves page faults
+# about as fast as vmtouch reads ahead, so every preload below, the browsers'
+# and LibreOffice's included, would only compete with the boot. lsblk -s
+# follows each device down to its disks through dm-crypt and LVM; a btrfs root
+# can span several, listed in sysfs. A root lsblk cannot place (an overlay on
+# live media) is preloaded.
+devices=("${ findmnt -n -o SOURCE /; }")
+devices=("${devices[@]%%\[*}")
+if [[ ${ findmnt -n -o FSTYPE /; } == btrfs ]]; then
+    devices=(/sys/fs/btrfs/"${ findmnt -n -o UUID /; }"/devices/*)
+    devices=("${devices[@]/#*\//\/dev\/}")
+fi
+rotational=${ lsblk -s -n -o ROTA "${devices[@]}" 2>/dev/null; }
+[[ -n $rotational && $rotational != *1* ]] && exit 0
+
 dm_link=${ readlink /etc/systemd/system/display-manager.service 2>/dev/null; }
 mem_kb=${ awk '/MemTotal/ {print $2}' /proc/meminfo; }
 
