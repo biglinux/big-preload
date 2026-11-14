@@ -1,7 +1,13 @@
 #!/bin/bash
 #
-# big-preload - Preload essential files into page cache at boot
-# Uses vmtouch with low CPU/IO priority to avoid impacting boot performance.
+# big-preload - Read the files the next login and its programs open into the
+# page cache, on a machine whose root is on a spinning disk.
+#
+# It starts once the disk has gone quiet: the login screen is drawn and waits
+# for a password, or an automatic login's desktop is up. Measured on a hard
+# disk, reading any earlier, even at idle priority, delayed the login screen
+# by about 2.5 s. It reads at idle CPU and I/O priority, so a login started
+# meanwhile goes first.
 # The -t flag is required: without it vmtouch only diagnoses cache state.
 #
 
@@ -17,6 +23,19 @@ preload() {
 }
 
 preload_big_desktop() {
+    # The GPU driver the compositor opens at run time, which ldd does not
+    # list: NVIDIA's proprietary EGL stack when its module drives the GPU,
+    # Mesa's otherwise. Read without ldd: libLLVM, which Mesa links, is left
+    # to page faults, since only drivers that compile shaders with it touch
+    # most of its pages.
+    local driver=(/usr/lib/libgallium-*.so /usr/lib/libEGL_mesa.so.0 /usr/lib/libgbm.so.1
+                  /usr/lib/gbm/dri_gbm.so)
+    [[ -d /sys/module/nvidia_drm ]] &&
+        driver=(/usr/lib/libEGL_nvidia.so.0 /usr/lib/libnvidia-eglcore.so.*
+                /usr/lib/libnvidia-glsi.so.* /usr/lib/libnvidia-gpucomp.so.*
+                /usr/lib/gbm/nvidia-drm_gbm.so /usr/lib/libgbm.so.1)
+    nice -n 19 ionice -c 3 vmtouch -q -t -f "${driver[@]}" >/dev/null 2>&1
+
     preload /usr/bin/big-compositor /usr/bin/big-compositor-wrapper \
             /usr/bin/big-host /usr/lib/big-host/modules/libbig_shell.so \
             /usr/lib/big-host/modules/libbig_workbench.so \
@@ -25,11 +44,10 @@ preload_big_desktop() {
 }
 
 # Only a root on a spinning disk gains: a solid-state disk serves page faults
-# about as fast as vmtouch reads ahead, so every preload below, the browsers'
-# and LibreOffice's included, would only compete with the boot. lsblk -s
-# follows each device down to its disks through dm-crypt and LVM; a btrfs root
-# can span several, listed in sysfs. A root lsblk cannot place (an overlay on
-# live media) is preloaded.
+# about as fast as vmtouch reads ahead, so every preload below would only
+# compete with the boot. lsblk -s follows each device down to its disks
+# through dm-crypt and LVM; a btrfs root can span several, listed in sysfs. A
+# root lsblk cannot place (an overlay on live media) is preloaded.
 devices=("${ findmnt -n -o SOURCE /; }")
 devices=("${devices[@]%%\[*}")
 if [[ ${ findmnt -n -o FSTYPE /; } == btrfs ]]; then
@@ -38,6 +56,26 @@ if [[ ${ findmnt -n -o FSTYPE /; } == btrfs ]]; then
 fi
 rotational=${ lsblk -s -n -o ROTA "${devices[@]}" 2>/dev/null; }
 [[ -n $rotational && $rotational != *1* ]] && exit 0
+
+# Wait until those disks have read nothing for a second, at most 90 s. The
+# sleep builtin from bash's loadables keeps the loop from starting a process
+# ten times a second.
+enable -f /usr/lib/bash/sleep sleep
+disks=${ lsblk -s -n -r -o KNAME,TYPE "${devices[@]}" 2>/dev/null | awk '$2 == "disk" {print $1}'; }
+last="" quiet=0
+for (( tick = 0; tick < 900 && quiet < 10; tick++ )); do
+    now=""
+    for disk in $disks; do
+        read -r reads _ </sys/block/"$disk"/stat
+        now+="$reads "
+    done
+    if [[ $now == "$last" ]]; then
+        (( quiet++ ))
+    else
+        quiet=0 last=$now
+    fi
+    sleep 0.1
+done
 
 dm_link=${ readlink /etc/systemd/system/display-manager.service 2>/dev/null; }
 mem_kb=${ awk '/MemTotal/ {print $2}' /proc/meminfo; }
