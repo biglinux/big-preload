@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Preload the default web browser
+Exec=/usr/bin/big-preload --session
+NoDisplay=true
+X-GNOME-Autostart-Phase=Applications

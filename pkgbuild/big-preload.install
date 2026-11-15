@@ -1,17 +1,17 @@
 post_install() {
+    # Each account's default browser is read without a flag; an enable-NAME
+    # file, written by BigLinux Settings, adds another browser or LibreOffice.
     install -d /etc/big-preload
-    # Default-enabled browsers and suites. User may drop more enable-* flags
-    # (chromium, opera, vivaldi, palemoon, epiphany) to opt into them.
-    touch /etc/big-preload/enable-firefox \
-          /etc/big-preload/enable-librewolf \
-          /etc/big-preload/enable-brave \
-          /etc/big-preload/enable-chrome \
-          /etc/big-preload/enable-libreoffice
 }
 
 post_upgrade() {
-    # The defaults are created once; a flag the person removed stays removed.
-    [[ -d /etc/big-preload ]] || post_install
+    post_install
+    # Versions before 26.11.14 read every browser with a flag, and created
+    # flags for Firefox, LibreWolf, Brave, Chrome and LibreOffice on install.
+    # Those defaults go, so an upgraded machine reads what a new one does.
+    if (( $(vercmp "$2" 26.11.14) < 0 )); then
+        rm -f /etc/big-preload/enable-{firefox,librewolf,brave,chrome,libreoffice}
+    fi
     # The unit moved from local-fs-pre.target to graphical.target.
     if systemctl is-enabled -q big-preload.service 2>/dev/null; then
         systemctl reenable big-preload.service 2>/dev/null
@@ -19,6 +19,6 @@ post_upgrade() {
 }
 
 post_remove() {
-    rm -f /etc/big-preload/enable-*
-    rmdir --ignore-fail-on-non-empty /etc/big-preload 2>/dev/null || true
+    rm -f /etc/big-preload/enable-* /var/lib/big-preload/defragmented
+    rmdir --ignore-fail-on-non-empty /etc/big-preload /var/lib/big-preload 2>/dev/null || true
 }

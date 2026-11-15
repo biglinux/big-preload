@@ -1,14 +1,47 @@
 #!/bin/bash
 #
-# big-preload - Preload essential files into page cache at boot
-# Uses vmtouch with low CPU/IO priority to avoid impacting boot performance.
-# The -t flag is required: without it vmtouch only diagnoses cache state.
+# big-preload - Read the files the next login and its programs open into the
+# page cache, on a machine whose root is on a spinning disk.
+#
+# It starts once the disk has gone quiet: the login screen is drawn and waits
+# for a password, or an automatic login's desktop is up. Measured on a hard
+# disk, reading any earlier, even at idle priority, delayed the login screen
+# by about 2.5 s. It reads at idle CPU and I/O priority, so a login started
+# meanwhile goes first: the desktop the login screen starts, each account's
+# default web browser, and the browsers and LibreOffice switched on in
+# BigLinux Settings (/etc/big-preload/enable-NAME).
+#
+# With --session, XDG autostart runs it as the account that logged in, at the
+# desktop's first frame, to read that account's browsers and LibreOffice right
+# away: after an automatic login the disk stays busy long after the desktop is
+# up, so the boot's run gets to them late. Whichever run comes second finds
+# the pages in memory and reads nothing.
+#
+# With /etc/big-preload/enable-defragment, on a btrfs root it also rewrites
+# the BigLinux desktop's files into long extents, which a hard disk reads
+# without seeking between scattered pieces: once at boot, and with
+# --defragment, from a pacman hook, the ones the update just wrote, which no
+# snapshot shares yet. It is off by default: on a disk defragmented a few days
+# earlier it changed neither the login screen's nor the desktop's start.
 #
 
 set +e  # best-effort; never block boot
+mode=boot
+case $1 in
+    --session) mode=session ;;
+    --defragment) mode=defragment ;;
+esac
+# The paths a pacman transaction wrote, which its hook hands on stdin: read
+# before any early exit, since pacman writes them all before it waits, and in
+# one go, since bash's read takes a pipe one byte at a time.
+if [[ $mode == defragment ]]; then
+    written=${ cat; }
+    [[ -e /etc/big-preload/enable-defragment ]] || exit 0
+fi
 
 preload() {
     # Touch all given files (and their shared-library dependencies) into page cache.
+    # The -t flag is required: without it vmtouch only diagnoses cache state.
     # Usage: preload FILE [FILE...]
     local libs
     libs=${ ldd "$@" 2>/dev/null | awk '/=>/ {print $3}' | sort -u; }
@@ -16,41 +49,213 @@ preload() {
     nice -n 19 ionice -c 3 vmtouch -q -t -f $libs "$@" >/dev/null 2>&1
 }
 
-preload_file_list() {
-    # Read a newline-separated list of paths and preload them.
-    # Usage: preload_file_list PATH
-    local list=$1
-    [[ -r $list ]] || return 0
-    # shellcheck disable=SC2046
-    nice -n 19 ionice -c 3 vmtouch -q -t $(<"$list") >/dev/null 2>&1
+big_desktop_files() {
+    # Fills files with the ones the BigLinux desktop's package measured from
+    # greetd's start to the bar's first frame: common.list on every machine,
+    # then the list of the GPU driver in use. A * stands for a version that
+    # package updates change.
+    # The translations were recorded in one language, named in the path of
+    # gettext catalogs, Qt translations and X11 compose tables; that name is
+    # swapped for the language in use. en_US, X11's fallback, stays.
+    local driver=mesa line path tag='[a-z]{2,3}_?[A-Z]{0,2}'
+    files=()
+    [[ -d /sys/module/nvidia_drm ]] && driver=nvidia
+    shopt -s nullglob
+    while read -r line; do
+        if [[ $line =~ ^(/usr/share/locale/)($tag)(/LC_MESSAGES/.+)$ ||
+              $line =~ ^(/usr/share/qt6/translations/.+_)($tag)(\.qm)$ ||
+              $line =~ ^(/usr/share/X11/locale/)($tag)(\.UTF-8/Compose)$ ]] &&
+            [[ ${BASH_REMATCH[2]} != en_US ]]; then
+            files+=("${BASH_REMATCH[1]}${language}_$region${BASH_REMATCH[3]}"
+                    "${BASH_REMATCH[1]}$language${BASH_REMATCH[3]}")
+            continue
+        fi
+        for path in $line; do
+            files+=("$path")
+        done
+    done < <(cat /usr/share/big-preload/{common,"$driver"}.list 2>/dev/null)
+    shopt -u nullglob
 }
+
+preload_big_desktop() {
+    local files
+    big_desktop_files
+    (( ${#files[@]} )) &&
+        nice -n 19 ionice -c 3 vmtouch -q -t -f "${files[@]}" >/dev/null 2>&1
+}
+
+defragment() {
+    # Rewrites each file into long extents, compressed as the root is mounted.
+    # A file a snapshot shares is copied, and its old blocks come back only
+    # when that snapshot is deleted.
+    # Usage: defragment FILE [FILE...]
+    local compress=()
+    if [[ ${ findmnt -n -o OPTIONS /; } =~ compress(-force)?=([a-z]+)(:(-?[0-9]+))? ]]; then
+        compress=("-c${BASH_REMATCH[2]}")
+        [[ -n ${BASH_REMATCH[4]} ]] && compress+=(-L "${BASH_REMATCH[4]}")
+    fi
+    nice -n 19 ionice -c 3 btrfs filesystem defragment "${compress[@]}" -- "$@" >/dev/null 2>&1
+}
+
+preload_browser() {
+    # The files a browser opens on its way to a first window, traced with
+    # strace, with the translation of the system's language only: its
+    # program directory also holds every other language and libraries that
+    # load later or never. Programs come from fixed directories only.
+    # Usage: preload_browser NAME (the enable-NAME of BigLinux Settings)
+    local family dir program elf translation tag candidate file files=() read_files=() libs
+    case $1 in
+        brave)     family=chromium dir=/usr/lib/brave-browser program=brave ;;
+        chrome)    family=chromium dir=/opt/google/chrome program=chrome ;;
+        chromium)  family=chromium dir=/usr/lib/chromium program=chromium ;;
+        vivaldi)   family=chromium dir=/opt/vivaldi program=vivaldi-bin ;;
+        opera)     family=chromium dir=/usr/lib/opera program=opera ;;
+        firefox)   family=gecko dir=/usr/lib/firefox program=firefox ;;
+        librewolf) family=gecko dir=/usr/lib/librewolf program=librewolf ;;
+        palemoon)  family=gecko dir=/usr/lib/palemoon program=palemoon ;;
+        epiphany)  family=webkit ;;
+        *) return ;;
+    esac
+    case $family in
+        chromium)
+            # Chromium names a translation pt-BR or es; Spanish outside Spain
+            # is es-419, and en-US is what it falls back to.
+            local tags=("$language-$region")
+            [[ $language == es && -n $region && $region != ES ]] && tags+=(es-419)
+            tags+=("$language" en-US)
+            for tag in "${tags[@]}"; do
+                for candidate in "$dir/locales/$tag.pak" "$dir/localization/$tag.pak"; do
+                    [[ -f $candidate ]] && translation=$candidate && break 2
+                done
+            done
+            elf=$dir/$program
+            files=("$elf" "$dir"/*.pak "$dir/icudtl.dat" "$dir/v8_context_snapshot.bin"
+                   "$dir/snapshot_blob.bin" "$translation"
+                   # Google Chrome loads these three at start.
+                   "$dir/liboptimization_guide_internal.so" "$dir/libLiteRtWebGpuAccelerator.so"
+                   "$dir/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so")
+            ;;
+        gecko)
+            # A translation is a language pack from the browser's i18n package.
+            for candidate in "$dir"/browser/extensions/langpack-{"$language-$region","$language"}@*.xpi; do
+                [[ -f $candidate ]] && translation=$candidate && break
+            done
+            elf=$dir/libxul.so
+            files=("$dir/$program" "$elf" "$dir/omni.ja" "$dir/browser/omni.ja"
+                   "$dir/libgkcodecs.so" "$dir/libmozavcodec.so" "$dir/libmozavutil.so"
+                   "$dir/libmozsqlite3.so" "$dir/libmozsandbox.so" "$dir/liblgpllibs.so"
+                   "$dir/libmozwayland.so" "$dir/libmozgtk.so" "$dir/fonts/TwemojiMozilla.ttf"
+                   "$translation")
+            ;;
+        webkit)
+            elf=/usr/bin/epiphany
+            files=("$elf" /usr/lib/webkitgtk-6.0/WebKitWebProcess /usr/lib/webkitgtk-6.0/WebKitNetworkProcess)
+            ;;
+    esac
+    [[ -f $elf ]] || return
+    # A name the installed version lacks, or a glob without a match, is left out.
+    for file in "${files[@]}"; do
+        [[ -f $file ]] && read_files+=("$file")
+    done
+    libs=${ ldd "$elf" 2>/dev/null | awk '/=>/ {print $3}' | sort -u; }
+    # shellcheck disable=SC2086
+    nice -n 19 ionice -c 3 vmtouch -q -t -f "${read_files[@]}" $libs >/dev/null 2>&1
+}
+
+# Only a root on a spinning disk gains: a solid-state disk serves page faults
+# about as fast as vmtouch reads ahead, so every preload below would only
+# compete with the boot. lsblk -s follows each device down to its disks
+# through dm-crypt and LVM; a btrfs root can span several, listed in sysfs. A
+# root lsblk cannot place (an overlay on live media) is preloaded.
+devices=("${ findmnt -n -o SOURCE /; }")
+devices=("${devices[@]%%\[*}")
+root_type=${ findmnt -n -o FSTYPE /; }
+if [[ $root_type == btrfs ]]; then
+    devices=(/sys/fs/btrfs/"${ findmnt -n -o UUID /; }"/devices/*)
+    devices=("${devices[@]/#*\//\/dev\/}")
+fi
+rotational=${ lsblk -s -n -o ROTA "${devices[@]}" 2>/dev/null; }
+[[ -n $rotational && $rotational != *1* ]] && exit 0
+
+# Wait until those disks have read nothing for a second, at most 90 s. The
+# sleep builtin from bash's loadables keeps the loop from starting a process
+# ten times a second.
+enable -f /usr/lib/bash/sleep sleep
+disks=${ lsblk -s -n -r -o KNAME,TYPE "${devices[@]}" 2>/dev/null | awk '$2 == "disk" {print $1}'; }
+last="" quiet=0
+[[ $mode != boot ]] && quiet=10  # the session is up, or pacman runs: no wait
+for (( tick = 0; tick < 900 && quiet < 10; tick++ )); do
+    now=""
+    for disk in $disks; do
+        read -r reads _ </sys/block/"$disk"/stat
+        now+="$reads "
+    done
+    if [[ $now == "$last" ]]; then
+        (( quiet++ ))
+    else
+        quiet=0 last=$now
+    fi
+    sleep 0.1
+done
 
 dm_link=${ readlink /etc/systemd/system/display-manager.service 2>/dev/null; }
 mem_kb=${ awk '/MemTotal/ {print $2}' /proc/meminfo; }
 
+# The language in use, pt_BR.UTF-8 giving pt and BR, for the translations of
+# the browsers and LibreOffice: the session's, or the system's, which systemd
+# hands its services from /etc/locale.conf.
+locale=${LC_ALL:-${LC_MESSAGES:-$LANG}}
+locale=${locale%%[.@]*}
+language=${locale%%_*}
+region=${locale#"$language"}
+region=${region#_}
+
+# From the pacman hook, only the desktop's files the transaction wrote are
+# rewritten, with the kernels and initramfs images written since pacman took
+# its lock: a file older than the transaction may be in a snapshot.
+if [[ $mode == defragment ]]; then
+    [[ $root_type == btrfs ]] || exit 0
+    big_desktop_files
+    new=()
+    if (( ${#files[@]} )); then
+        mapfile -t new < <(realpath -e -- "${files[@]}" 2>/dev/null | sort -u |
+            awk 'NR == FNR {written["/" $0]; next} $0 in written' <(printf '%s\n' "$written") -)
+    fi
+    if [[ ${ findmnt -n -o UUID -T /boot; } == "${ findmnt -n -o UUID /; }" ]]; then
+        mapfile -t -O "${#new[@]}" new < <(find /boot -maxdepth 1 -type f \
+            \( -name 'vmlinuz-*' -o -name 'initramfs-*.img' \) -newer /var/lib/pacman/db.lck 2>/dev/null)
+    fi
+    (( ${#new[@]} )) && defragment "${new[@]}"
+    exit 0
+fi
+
 # Desktop environment preloading (requires >= 1.5 GB RAM)
-if (( mem_kb > 1500000 )); then
+if (( mem_kb > 1500000 )) && [[ $mode == boot ]]; then
 
     # KDE Plasma / SDDM
     if [[ $dm_link == */sddm.service ]]; then
         preload /usr/bin/sddm /usr/bin/sddm-greeter /usr/bin/sddm-greeter-qt6 \
                 /usr/lib/sddm/sddm-helper /usr/bin/kwin_wayland
 
-        preload /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 \
-                /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 \
-                /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland \
-                /usr/bin/dbus-broker-launch /usr/lib/dconf-service \
-                /usr/lib/kactivitymanagerd /usr/bin/ksmserver \
-                /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil \
-                /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy \
-                /usr/bin/kdeconnectd /usr/lib/geoclue-2.0/demos/agent \
-                /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
-                /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber \
-                /usr/bin/ksplashqml
-
-        # Last logged-in user's custom preload list (SDDM state file)
-        user=${ awk -F= '/^User=/ {gsub(/[[:space:]]+$/,"",$2); print $2}' /var/lib/sddm/state.conf 2>/dev/null; }
-        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
+        # The session the login screen offers: Plasma, or the BigLinux desktop
+        # on its own compositor (biglinux.desktop), which maps none of Plasma's
+        # files. biglinux-kwin runs KWin and takes Plasma's list.
+        session=${ awk -F= '/^Session=/ {print $2}' /var/lib/sddm/state.conf 2>/dev/null; }
+        if [[ $session == */biglinux*.desktop* && $session != *biglinux-kwin* ]]; then
+            preload_big_desktop
+        else
+            preload /usr/bin/plasmashell /usr/bin/kwin_x11 /usr/bin/kded6 \
+                    /usr/bin/dolphin /usr/bin/kate /usr/bin/kwalletd6 \
+                    /usr/bin/startplasma-x11 /usr/bin/startplasma-wayland \
+                    /usr/bin/dbus-broker-launch /usr/lib/dconf-service \
+                    /usr/lib/kactivitymanagerd /usr/bin/ksmserver \
+                    /usr/lib/polkit-kde-authentication-agent-1 /usr/lib/org_kde_powerdevil \
+                    /usr/bin/xembedsniproxy /usr/bin/kaccess /usr/bin/gmenudbusmenuproxy \
+                    /usr/bin/kdeconnectd /usr/lib/geoclue-2.0/demos/agent \
+                    /usr/bin/msm_kde_notifier /usr/lib/gvfsd /usr/lib/gvfsd-fuse \
+                    /usr/bin/konsole /usr/bin/pipewire /usr/bin/wireplumber \
+                    /usr/bin/ksplashqml
+        fi
 
         preload /usr/bin/gnome-calculator
     fi
@@ -86,36 +291,11 @@ if (( mem_kb > 1500000 )); then
                 /usr/lib/goa-daemon /usr/lib/gnome-shell-calendar-server \
                 /usr/bin/nautilus /usr/bin/gnome-calculator /usr/bin/kgx \
                 /usr/bin/gnome-system-monitor /usr/bin/gnome-text-editor
-
-        # Last logged-in user via AccountsService: sort by mtime (most recent login
-        # updates the user file), then verify it's a regular user account.
-        user=
-        # shellcheck disable=SC2043  # valsub `${ ; }` not understood by shellcheck
-        for f in ${ ls -t /var/lib/AccountsService/users/ 2>/dev/null; }; do
-            if awk -F= '
-                /^SystemAccount=/  { sys = ($2 == "true") }
-                /^UserName=/       { name = $2 }
-                END { if (!sys && name != "") print name }
-            ' "/var/lib/AccountsService/users/$f" | grep -q .; then
-                user=$f
-                break
-            fi
-        done
-        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
     fi
 
     # BigLinux desktop / greetd
     if [[ $dm_link == */greetd.service ]]; then
-        preload /usr/bin/greetd /usr/lib/bigshell/biggreeter-session \
-                /usr/bin/big-compositor /usr/bin/big-compositor-wrapper \
-                /usr/bin/big-host /usr/lib/big-host/modules/libbig_shell.so \
-                /usr/lib/big-host/modules/libbig_workbench.so \
-                /usr/lib/xdg-desktop-portal-big /usr/lib/xdg-desktop-portal \
-                /usr/bin/dbus-broker-launch /usr/bin/pipewire /usr/bin/wireplumber
-
-        # Last logged-in user (the login screen keeps the name on the first line)
-        user=${ head -n 1 /var/lib/biggreeter/biggreeter/last 2>/dev/null; }
-        [[ $user =~ ^[a-z_][a-z0-9_-]*$ ]] && preload_file_list "/home/$user/.big_preload"
+        preload_big_desktop
     fi
 
     # Cinnamon / XFCE / MATE / Budgie / LXQt on LightDM
@@ -177,31 +357,85 @@ if (( mem_kb > 1500000 )); then
                 ;;
         esac
 
-        # Last logged-in user (LightDM state file)
-        user=${ awk -F= '/^last-user=/ {gsub(/[[:space:]]+/,"",$0); print $2}' /var/lib/lightdm/.cache/lightdm-gtk-greeter/state 2>/dev/null; }
-        [[ -n $user ]] && preload_file_list "/home/$user/.big_preload"
-
         preload /usr/bin/gnome-calculator
     fi
 fi
 
-# Browser preloading (requires >= 2.5 GB RAM)
+# Web browsers (requires >= 2.5 GB RAM): the default of the account in the
+# session, or at boot of each account, asked as that account so its settings
+# are not read as root; and the ones switched on.
 if (( mem_kb > 2500000 )); then
-    [[ -e /etc/big-preload/enable-firefox   ]] && preload /usr/lib/firefox/firefox
-    [[ -e /etc/big-preload/enable-librewolf ]] && preload /usr/lib/librewolf/librewolf
-    [[ -e /etc/big-preload/enable-brave     ]] && preload /usr/lib/brave-browser/brave
-    [[ -e /etc/big-preload/enable-chrome    ]] && preload /opt/google/chrome/chrome
-    [[ -e /etc/big-preload/enable-chromium  ]] && preload /usr/lib/chromium/chromium
-    [[ -e /etc/big-preload/enable-palemoon  ]] && preload /usr/lib/palemoon/palemoon-bin
-    [[ -e /etc/big-preload/enable-opera     ]] && preload /usr/lib/opera/opera
-    [[ -e /etc/big-preload/enable-vivaldi   ]] && preload /opt/vivaldi/vivaldi-bin
-    [[ -e /etc/big-preload/enable-epiphany  ]] && preload /usr/bin/epiphany
+    declare -A by_desktop_id=(
+        [brave-browser.desktop]=brave [google-chrome.desktop]=chrome
+        [chromium.desktop]=chromium [vivaldi-stable.desktop]=vivaldi
+        [opera.desktop]=opera [firefox.desktop]=firefox
+        [librewolf.desktop]=librewolf [palemoon.desktop]=palemoon
+        [org.gnome.Epiphany.desktop]=epiphany
+    )
+    declare -A browsers=()
+    if [[ $mode == session ]]; then
+        desktop_id=${ xdg-mime query default x-scheme-handler/https 2>/dev/null; }
+        [[ -n $desktop_id && -n ${by_desktop_id[$desktop_id]} ]] && browsers[${by_desktop_id[$desktop_id]}]=1
+    else
+        while IFS=: read -r _ _ uid gid _ home shell; do
+            (( uid >= 1000 && uid < 60000 )) || continue
+            [[ -d $home && $shell != */nologin && $shell != */false ]] || continue
+            # Bounded: the account owns the files xdg-mime reads, and a FIFO
+            # there would otherwise hold the boot's run forever.
+            desktop_id=${ timeout 5 setpriv --reuid="$uid" --regid="$gid" --init-groups --reset-env \
+                              xdg-mime query default x-scheme-handler/https </dev/null 2>/dev/null; }
+            [[ -n $desktop_id && -n ${by_desktop_id[$desktop_id]} ]] && browsers[${by_desktop_id[$desktop_id]}]=1
+        done </etc/passwd
+    fi
+    for flag in /etc/big-preload/enable-*; do
+        [[ -e $flag ]] && browsers[${flag##*/enable-}]=1
+    done
+    for name in "${!browsers[@]}"; do
+        preload_browser "$name"
+    done
 fi
 
-# LibreOffice preloading (requires >= 3.4 GB RAM)
-if [[ -e /etc/big-preload/enable-libreoffice ]] && (( mem_kb > 3400000 )); then
-    nice -n 19 ionice -c 3 vmtouch -q -t -f /usr/lib/libreoffice/program/ >/dev/null 2>&1
-    preload /usr/lib/libreoffice/program/soffice.bin
+# LibreOffice, when switched on (requires >= 3.4 GB RAM): the libraries,
+# registry and type data its programs load, and only the language in use of
+# its translations; the rest of its 500 MB is templates, galleries and help.
+office=/usr/lib/libreoffice
+if [[ -e /etc/big-preload/enable-libreoffice && -f $office/program/soffice.bin ]] && (( mem_kb > 3400000 )); then
+    office_files=("$office"/program/*.so "$office"/program/*.rdb "$office"/program/types/*.rdb
+                  "$office"/program/services/*.rdb "$office"/share/registry/*.xcd
+                  "$office"/share/config/images_colibre.zip "$office"/share/config/images_elementary.zip)
+    for tag in "$language-$region" "$language"; do
+        if [[ -f $office/share/registry/Langpack-$tag.xcd ]]; then
+            office_files+=("$office/share/registry/res/registry_$tag.xcd"
+                           "$office/share/registry/res/fcfg_langpack_$tag.xcd"
+                           "$office/program/resource/${tag/-/_}"/LC_MESSAGES/*.mo)
+            break
+        fi
+    done
+    preload "$office/program/soffice.bin"
+    nice -n 19 ionice -c 3 vmtouch -q -t -f "${office_files[@]}" >/dev/null 2>&1
+fi
+
+# The first rewrite of the desktop's files, the kernels and the initramfs
+# images, after the reads above put them in memory. Files snapshots share are
+# copied, so it waits for free space of their size plus 1 GiB; once tried it
+# is not tried again, since rewriting compressed files moves them every time.
+stamp=/var/lib/big-preload/defragmented
+if [[ $mode == boot && $root_type == btrfs && -e /etc/big-preload/enable-defragment && ! -e $stamp &&
+      -s /usr/share/big-preload/common.list ]]; then
+    big_desktop_files
+    mapfile -t files < <(realpath -e -- "${files[@]}" 2>/dev/null | sort -u)
+    if [[ ${ findmnt -n -o UUID -T /boot; } == "${ findmnt -n -o UUID /; }" ]]; then
+        mapfile -t -O "${#files[@]}" files < <(find /boot -maxdepth 1 -type f \
+            \( -name 'vmlinuz-*' -o -name 'initramfs-*.img' \))
+    fi
+    if (( ${#files[@]} )); then
+        size_kb=${ du -c -k -- "${files[@]}" 2>/dev/null | awk 'END {print $1}'; }
+        free_kb=${ df --output=avail -k / | awk 'NR == 2 {print $1}'; }
+        if (( free_kb > size_kb + 1048576 )); then
+            defragment "${files[@]}"
+            mkdir -p "${stamp%/*}" && : >"$stamp"
+        fi
+    fi
 fi
 
 exit 0
