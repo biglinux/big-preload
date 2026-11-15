@@ -19,6 +19,6 @@ post_upgrade() {
 }
 
 post_remove() {
-    rm -f /etc/big-preload/enable-*
-    rmdir --ignore-fail-on-non-empty /etc/big-preload 2>/dev/null || true
+    rm -f /etc/big-preload/enable-* /var/lib/big-preload/defragmented
+    rmdir --ignore-fail-on-non-empty /etc/big-preload /var/lib/big-preload 2>/dev/null || true
 }

@@ -1,0 +1,15 @@
+# After mkinitcpio writes the initramfs images, before anything snapshots the
+# result: big-preload rewrites the files the transaction wrote that the
+# BigLinux desktop starts with, on a btrfs root on a hard disk only.
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/*
+Target = etc/*
+
+[Action]
+Description = Defragmenting the files the desktop starts with...
+When = PostTransaction
+Exec = /usr/bin/big-preload --defragment
+NeedsTargets

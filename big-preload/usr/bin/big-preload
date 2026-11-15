@@ -17,10 +17,27 @@
 # up, so the boot's run gets to them late. Whichever run comes second finds
 # the pages in memory and reads nothing.
 #
+# With /etc/big-preload/enable-defragment, on a btrfs root it also rewrites
+# the BigLinux desktop's files into long extents, which a hard disk reads
+# without seeking between scattered pieces: once at boot, and with
+# --defragment, from a pacman hook, the ones the update just wrote, which no
+# snapshot shares yet. It is off by default: on a disk defragmented a few days
+# earlier it changed neither the login screen's nor the desktop's start.
+#
 
 set +e  # best-effort; never block boot
 mode=boot
-[[ $1 == --session ]] && mode=session
+case $1 in
+    --session) mode=session ;;
+    --defragment) mode=defragment ;;
+esac
+# The paths a pacman transaction wrote, which its hook hands on stdin: read
+# before any early exit, since pacman writes them all before it waits, and in
+# one go, since bash's read takes a pipe one byte at a time.
+if [[ $mode == defragment ]]; then
+    written=${ cat; }
+    [[ -e /etc/big-preload/enable-defragment ]] || exit 0
+fi
 
 preload() {
     # Touch all given files (and their shared-library dependencies) into page cache.
@@ -32,14 +49,16 @@ preload() {
     nice -n 19 ionice -c 3 vmtouch -q -t -f $libs "$@" >/dev/null 2>&1
 }
 
-preload_big_desktop() {
-    # The files the BigLinux desktop's package measured from greetd's start to
-    # the bar's first frame: common.list on every machine, then the list of the
-    # GPU driver in use. A * stands for a version that package updates change.
+big_desktop_files() {
+    # Fills files with the ones the BigLinux desktop's package measured from
+    # greetd's start to the bar's first frame: common.list on every machine,
+    # then the list of the GPU driver in use. A * stands for a version that
+    # package updates change.
     # The translations were recorded in one language, named in the path of
     # gettext catalogs, Qt translations and X11 compose tables; that name is
     # swapped for the language in use. en_US, X11's fallback, stays.
-    local driver=mesa line path files=() tag='[a-z]{2,3}_?[A-Z]{0,2}'
+    local driver=mesa line path tag='[a-z]{2,3}_?[A-Z]{0,2}'
+    files=()
     [[ -d /sys/module/nvidia_drm ]] && driver=nvidia
     shopt -s nullglob
     while read -r line; do
@@ -56,8 +75,26 @@ preload_big_desktop() {
         done
     done < <(cat /usr/share/big-preload/{common,"$driver"}.list 2>/dev/null)
     shopt -u nullglob
+}
+
+preload_big_desktop() {
+    local files
+    big_desktop_files
     (( ${#files[@]} )) &&
         nice -n 19 ionice -c 3 vmtouch -q -t -f "${files[@]}" >/dev/null 2>&1
+}
+
+defragment() {
+    # Rewrites each file into long extents, compressed as the root is mounted.
+    # A file a snapshot shares is copied, and its old blocks come back only
+    # when that snapshot is deleted.
+    # Usage: defragment FILE [FILE...]
+    local compress=()
+    if [[ ${ findmnt -n -o OPTIONS /; } =~ compress(-force)?=([a-z]+)(:(-?[0-9]+))? ]]; then
+        compress=("-c${BASH_REMATCH[2]}")
+        [[ -n ${BASH_REMATCH[4]} ]] && compress+=(-L "${BASH_REMATCH[4]}")
+    fi
+    nice -n 19 ionice -c 3 btrfs filesystem defragment "${compress[@]}" -- "$@" >/dev/null 2>&1
 }
 
 preload_browser() {
@@ -132,7 +169,8 @@ preload_browser() {
 # root lsblk cannot place (an overlay on live media) is preloaded.
 devices=("${ findmnt -n -o SOURCE /; }")
 devices=("${devices[@]%%\[*}")
-if [[ ${ findmnt -n -o FSTYPE /; } == btrfs ]]; then
+root_type=${ findmnt -n -o FSTYPE /; }
+if [[ $root_type == btrfs ]]; then
     devices=(/sys/fs/btrfs/"${ findmnt -n -o UUID /; }"/devices/*)
     devices=("${devices[@]/#*\//\/dev\/}")
 fi
@@ -145,7 +183,7 @@ rotational=${ lsblk -s -n -o ROTA "${devices[@]}" 2>/dev/null; }
 enable -f /usr/lib/bash/sleep sleep
 disks=${ lsblk -s -n -r -o KNAME,TYPE "${devices[@]}" 2>/dev/null | awk '$2 == "disk" {print $1}'; }
 last="" quiet=0
-[[ $mode == session ]] && quiet=10  # the session is up: no wait
+[[ $mode != boot ]] && quiet=10  # the session is up, or pacman runs: no wait
 for (( tick = 0; tick < 900 && quiet < 10; tick++ )); do
     now=""
     for disk in $disks; do
@@ -171,6 +209,25 @@ locale=${locale%%[.@]*}
 language=${locale%%_*}
 region=${locale#"$language"}
 region=${region#_}
+
+# From the pacman hook, only the desktop's files the transaction wrote are
+# rewritten, with the kernels and initramfs images written since pacman took
+# its lock: a file older than the transaction may be in a snapshot.
+if [[ $mode == defragment ]]; then
+    [[ $root_type == btrfs ]] || exit 0
+    big_desktop_files
+    new=()
+    if (( ${#files[@]} )); then
+        mapfile -t new < <(realpath -e -- "${files[@]}" 2>/dev/null | sort -u |
+            awk 'NR == FNR {written["/" $0]; next} $0 in written' <(printf '%s\n' "$written") -)
+    fi
+    if [[ ${ findmnt -n -o UUID -T /boot; } == "${ findmnt -n -o UUID /; }" ]]; then
+        mapfile -t -O "${#new[@]}" new < <(find /boot -maxdepth 1 -type f \
+            \( -name 'vmlinuz-*' -o -name 'initramfs-*.img' \) -newer /var/lib/pacman/db.lck 2>/dev/null)
+    fi
+    (( ${#new[@]} )) && defragment "${new[@]}"
+    exit 0
+fi
 
 # Desktop environment preloading (requires >= 1.5 GB RAM)
 if (( mem_kb > 1500000 )) && [[ $mode == boot ]]; then
@@ -356,6 +413,29 @@ if [[ -e /etc/big-preload/enable-libreoffice && -f $office/program/soffice.bin ]
     done
     preload "$office/program/soffice.bin"
     nice -n 19 ionice -c 3 vmtouch -q -t -f "${office_files[@]}" >/dev/null 2>&1
+fi
+
+# The first rewrite of the desktop's files, the kernels and the initramfs
+# images, after the reads above put them in memory. Files snapshots share are
+# copied, so it waits for free space of their size plus 1 GiB; once tried it
+# is not tried again, since rewriting compressed files moves them every time.
+stamp=/var/lib/big-preload/defragmented
+if [[ $mode == boot && $root_type == btrfs && -e /etc/big-preload/enable-defragment && ! -e $stamp &&
+      -s /usr/share/big-preload/common.list ]]; then
+    big_desktop_files
+    mapfile -t files < <(realpath -e -- "${files[@]}" 2>/dev/null | sort -u)
+    if [[ ${ findmnt -n -o UUID -T /boot; } == "${ findmnt -n -o UUID /; }" ]]; then
+        mapfile -t -O "${#files[@]}" files < <(find /boot -maxdepth 1 -type f \
+            \( -name 'vmlinuz-*' -o -name 'initramfs-*.img' \))
+    fi
+    if (( ${#files[@]} )); then
+        size_kb=${ du -c -k -- "${files[@]}" 2>/dev/null | awk 'END {print $1}'; }
+        free_kb=${ df --output=avail -k / | awk 'NR == 2 {print $1}'; }
+        if (( free_kb > size_kb + 1048576 )); then
+            defragment "${files[@]}"
+            mkdir -p "${stamp%/*}" && : >"$stamp"
+        fi
+    fi
 fi
 
 exit 0
