@@ -33,24 +33,31 @@ preload() {
 }
 
 preload_big_desktop() {
-    # The GPU driver the compositor opens at run time, which ldd does not
-    # list: NVIDIA's proprietary EGL stack when its module drives the GPU,
-    # Mesa's otherwise. Read without ldd: libLLVM, which Mesa links, is left
-    # to page faults, since only drivers that compile shaders with it touch
-    # most of its pages.
-    local driver=(/usr/lib/libgallium-*.so /usr/lib/libEGL_mesa.so.0 /usr/lib/libgbm.so.1
-                  /usr/lib/gbm/dri_gbm.so)
-    [[ -d /sys/module/nvidia_drm ]] &&
-        driver=(/usr/lib/libEGL_nvidia.so.0 /usr/lib/libnvidia-eglcore.so.*
-                /usr/lib/libnvidia-glsi.so.* /usr/lib/libnvidia-gpucomp.so.*
-                /usr/lib/gbm/nvidia-drm_gbm.so /usr/lib/libgbm.so.1)
-    nice -n 19 ionice -c 3 vmtouch -q -t -f "${driver[@]}" >/dev/null 2>&1
-
-    preload /usr/bin/big-compositor /usr/bin/big-compositor-wrapper \
-            /usr/bin/big-host /usr/lib/big-host/modules/libbig_shell.so \
-            /usr/lib/big-host/modules/libbig_workbench.so \
-            /usr/lib/xdg-desktop-portal-big /usr/lib/xdg-desktop-portal \
-            /usr/bin/dbus-broker-launch /usr/bin/pipewire /usr/bin/wireplumber
+    # The files the BigLinux desktop's package measured from greetd's start to
+    # the bar's first frame: common.list on every machine, then the list of the
+    # GPU driver in use. A * stands for a version that package updates change.
+    # The translations were recorded in one language, named in the path of
+    # gettext catalogs, Qt translations and X11 compose tables; that name is
+    # swapped for the language in use. en_US, X11's fallback, stays.
+    local driver=mesa line path files=() tag='[a-z]{2,3}_?[A-Z]{0,2}'
+    [[ -d /sys/module/nvidia_drm ]] && driver=nvidia
+    shopt -s nullglob
+    while read -r line; do
+        if [[ $line =~ ^(/usr/share/locale/)($tag)(/LC_MESSAGES/.+)$ ||
+              $line =~ ^(/usr/share/qt6/translations/.+_)($tag)(\.qm)$ ||
+              $line =~ ^(/usr/share/X11/locale/)($tag)(\.UTF-8/Compose)$ ]] &&
+            [[ ${BASH_REMATCH[2]} != en_US ]]; then
+            files+=("${BASH_REMATCH[1]}${language}_$region${BASH_REMATCH[3]}"
+                    "${BASH_REMATCH[1]}$language${BASH_REMATCH[3]}")
+            continue
+        fi
+        for path in $line; do
+            files+=("$path")
+        done
+    done < <(cat /usr/share/big-preload/{common,"$driver"}.list 2>/dev/null)
+    shopt -u nullglob
+    (( ${#files[@]} )) &&
+        nice -n 19 ionice -c 3 vmtouch -q -t -f "${files[@]}" >/dev/null 2>&1
 }
 
 preload_browser() {
@@ -231,7 +238,6 @@ if (( mem_kb > 1500000 )) && [[ $mode == boot ]]; then
 
     # BigLinux desktop / greetd
     if [[ $dm_link == */greetd.service ]]; then
-        preload /usr/bin/greetd /usr/lib/bigshell/biggreeter-session
         preload_big_desktop
     fi
 
